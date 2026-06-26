@@ -27,22 +27,9 @@
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    CAM[Stereo L+R + IMU]
-    VSLAM[cogninav_vslam<br/>ORB-SLAM3]
-    DEPTH[cogninav_depth<br/>SGBM]
-    LANES[cogninav_lanes<br/>corridor monitor]
-    VIZ[cogninav_viz<br/>Iridescence]
-
-    CAM --> VSLAM
-    CAM --> DEPTH
-    CAM --> LANES
-    VSLAM -->|odom, map| VIZ
-    DEPTH -->|stereo_points| VIZ
-    LANES -->|lanes, in_lane| VIZ
-    VSLAM --> LANES
-```
+<p align="center">
+  <img src="docs/assets/cogninav-data-flow-architecture.png" alt="CogniNav data flow: stereo sensors through ROS 2 nodes to Iridescence viewer" width="900"/>
+</p>
 
 **Typical flow:** stereo images feed SLAM and perception; SLAM pose anchors lane geometry; depth and detections highlight obstacles and movers in the aisle; Iridescence shows map, trajectory, depth, and markers in one window.
 

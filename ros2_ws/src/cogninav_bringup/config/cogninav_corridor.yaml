@@ -1,0 +1,22 @@
+/cogninav_corridor_monitor:
+  ros__parameters:
+    # Uses left stereo image by default (EuRoC cam0).
+    image_topic: "/cam0/image_raw"
+    odom_topic: "/cogninav/odom"
+    lane_markers_topic: "/cogninav/lane_markers"
+    in_lane_markers_topic: "/cogninav/in_lane_markers"
+    map_frame: "map"
+    fx: 458.654
+    fy: 457.296
+    cx: 367.215
+    cy: 248.375
+    camera_height: 0.0
+    ground_z: 0.0
+    process_width: 640
+    sample_points: 20
+    history_frames: 40
+    corridor_margin_px: 8.0
+    detection_confidence: 0.45
+    enable_object_detection: true
+    mobilenet_prototxt: "/root/cogninav/models/MobileNetSSD_deploy.prototxt"
+    mobilenet_weights: "/root/cogninav/models/MobileNetSSD_deploy.caffemodel"

@@ -1,0 +1,15 @@
+/cogninav_depth:
+  ros__parameters:
+    left_image_topic: "/cam0/image_raw"
+    right_image_topic: "/cam1/image_raw"
+    odom_topic: "/cogninav/odom"
+    depth_points_topic: "/cogninav/stereo_points"
+    map_frame: "map"
+    # EuRoC cam0 / cam1 (rectified bags) — override per dataset
+    fx: 458.654
+    fy: 457.296
+    cx: 367.215
+    cy: 248.375
+    baseline_m: 0.11
+    max_points: 30000
+    sync_slop_sec: 0.05

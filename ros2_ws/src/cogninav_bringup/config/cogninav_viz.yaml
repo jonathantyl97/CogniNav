@@ -1,0 +1,18 @@
+/cogninav_viz:
+  ros__parameters:
+    enable_viewer: true
+    map_points_topic: "/cogninav/map_points"
+    stereo_points_topic: "/cogninav/stereo_points"
+    stereo_point_scale: 1.0
+    odom_topic: "/cogninav/odom"
+    max_points: 50000
+    trajectory_max_waypoints: 2000
+    point_scale: 1.5
+    trajectory_point_scale: 3.0
+    window_title: "CogniNav SLAM"
+    update_rate_hz: 20.0
+    lane_markers_topic: "/cogninav/lane_markers"
+    in_lane_markers_topic: "/cogninav/in_lane_markers"
+    lane_line_width: 3.0
+    in_lane_human_scale: 0.45
+    in_lane_car_scale: 0.75

@@ -1,0 +1,10 @@
+third_party/ORB_SLAM3/
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+models/*.caffemodel
+benchmarks/results/*.json
+benchmarks/results/*.zip
+*.pyc
+__pycache__/
+.DS_Store

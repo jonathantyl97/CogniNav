@@ -8,7 +8,7 @@
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/SLAM-ORB--SLAM3-blue?style=flat-square" alt="ORB-SLAM3"></a>
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/sensors-stereo_only-555?style=flat-square" alt="Stereo only"></a>
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/viz-Iridescence-6C5CE7?style=flat-square" alt="Iridescence"></a>
-  <a href="https://github.com/jonathantyl97/CogniNav/blob/master/plan.md"><img src="https://img.shields.io/badge/status-Phase_0-2ea44f?style=flat-square" alt="Phase 0"></a>
+  <a href="https://github.com/jonathantyl97/CogniNav/blob/main/plan.md"><img src="https://img.shields.io/badge/status-Phase_0-2ea44f?style=flat-square" alt="Phase 0"></a>
 </p>
 
 ---

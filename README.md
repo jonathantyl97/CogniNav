@@ -28,7 +28,7 @@
 ## Architecture
 
 <p align="center">
-  <img src="docs/assets/cogninav-data-flow-architecture.png" alt="CogniNav data flow: stereo sensors through ROS 2 nodes to Iridescence viewer" width="900"/>
+  <img src="docs/assets/cogninav-architecture-dataflow-en.png" alt="CogniNav data flow: stereo sensors through ROS 2 nodes to Iridescence viewer" width="900"/>
 </p>
 
 **Typical flow:** stereo images feed SLAM and perception; SLAM pose anchors lane geometry; depth and detections highlight obstacles and movers in the aisle; Iridescence shows map, trajectory, depth, and markers in one window.

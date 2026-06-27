@@ -31,7 +31,7 @@ CogniNavSlamNode::CogniNavSlamNode()
 {
   const std::string default_vocab = "/root/cogninav/third_party/ORB_SLAM3/Vocabulary/ORBvoc.txt";
   const std::string default_settings =
-    "/root/cogninav/third_party/ORB_SLAM3/Examples/Stereo-Inertial/EuRoC.yaml";
+    "/root/cogninav/ros2_ws/src/cogninav_bringup/config/orb_realsense_d455.yaml";
 
   this->declare_parameter<std::string>("vocabulary", default_vocab);
   this->declare_parameter<std::string>("settings", default_settings);

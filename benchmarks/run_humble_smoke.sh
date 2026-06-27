@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Phase 3: ROS 2 Humble parity — EuRoC SLAM smoke in cogninav_humble container.
+# ROS 2 Humble parity — warehouse SLAM smoke in cogninav_humble container.
 #
-# Usage (host or inside Humble container):
-#   ./benchmarks/run_humble_smoke.sh
-#   ./benchmarks/run_humble_smoke.sh --seq MH_01_easy --workspace-only
+# Usage:
+#   ./benchmarks/run_humble_smoke.sh --workspace-only
+#   ./benchmarks/run_humble_smoke.sh --seq aisle_cw_run_1
 
 set -euo pipefail
 
@@ -12,7 +12,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/benchmarks/cogninav_docker.sh"
 cogninav_reexec_in_humble "benchmarks/run_humble_smoke.sh" "$@"
 
-SEQ="MH_01_easy"
+SEQ="aisle_cw_run_1"
 WORKSPACE_ONLY=false
 
 while [[ $# -gt 0 ]]; do
@@ -25,7 +25,7 @@ done
 
 ORB_LIB="$ROOT/third_party/ORB_SLAM3/lib/libORB_SLAM3.so"
 
-echo "==> Phase 3 Humble smoke (EuRoC $SEQ)"
+echo "==> Humble smoke (warehouse $SEQ)"
 
 if [[ ! -f "$ORB_LIB" ]]; then
   echo "==> Building ORB-SLAM3 for Humble (first time)..."
@@ -47,19 +47,20 @@ DOCKER_IMAGE="$(cogninav_docker_image)"
 
 if [[ "$WORKSPACE_ONLY" == true ]]; then
   "$ROOT/benchmarks/run_benchmark.sh" \
-    --dataset euroc --seq "$SEQ" --phase 3 \
+    --dataset warehouse --seq "$SEQ" --phase 3 \
     --git-sha "$GIT_SHA" --docker-image "$DOCKER_IMAGE" \
     --smoke-status "workspace_ok" \
     --smoke-note "Humble: colcon build + libORB_SLAM3.so verified."
-  echo "==> Phase 3 Humble workspace smoke passed."
+  echo "==> Humble workspace smoke passed."
   exit 0
 fi
 
-export EUROC_DIR="${EUROC_DIR:-$(cogninav_downloads_dir)/euroc}"
+export WAREHOUSE_DIR="${WAREHOUSE_DIR:-$(cogninav_downloads_dir)/warehouse}"
 export COGNINAV_IN_HUMBLE=1
 export COGNINAV_IN_DOCKER=1
 export COGNINAV_BENCHMARK_PHASE=3
 
-"$ROOT/benchmarks/run_euroc_slam.sh" --seq "$SEQ"
+"$ROOT/scripts/download_warehouse.sh" --seq "$SEQ"
+"$ROOT/benchmarks/run_warehouse_slam.sh" --seq "$SEQ"
 
-echo "==> Phase 3 Humble EuRoC smoke complete."
+echo "==> Humble warehouse smoke complete."

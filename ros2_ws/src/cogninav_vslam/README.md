@@ -6,8 +6,8 @@ CogniNav does **not** support monocular SLAM or mono datasets.
 
 | Mode | When | ORB-SLAM3 enum |
 |------|------|----------------|
-| **Stereo-inertial** (default) | EuRoC, TUM-VI, rig with IMU | `System::STEREO_INERTIAL` |
-| **Stereo** | KITTI (no IMU in wrapper) | `System::STEREO` |
+| **Stereo-inertial** (default) | Warehouse rig/bag with IMU, TorWIC Azure | `System::STEREO_INERTIAL` |
+| **Stereo** | Stereo-only bags (no IMU in wrapper) | `System::STEREO` |
 
 ## Stereo topics (convention)
 
@@ -40,8 +40,7 @@ ORB_SLAM3::System slam(vocab, settings, System::STEREO_INERTIAL, false);
 
 Pangolin may still be required to **compile** stock ORB-SLAM3; viewer is **Iridescence**, not Pangolin.
 
-## Datasets (stereo only)
+## Datasets
 
-- EuRoC MAV (stereo-inertial)
-- TUM-VI (stereo-inertial)
-- KITTI Odometry (stereo)
+- **TorWIC-SLAM** warehouse bags (primary regression)
+- Live stereo rig recordings (`scripts/record_rig_bag.sh`)

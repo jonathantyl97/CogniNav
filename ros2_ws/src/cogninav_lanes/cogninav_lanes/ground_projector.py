@@ -27,7 +27,7 @@ def pixels_to_map_ground(
     """
     Lift 2D pixels to 3D on z=ground_z in map frame.
 
-    Assumes camera optical frame is aligned with body (EuRoC/KITTI style forward camera)
+    Assumes camera optical frame is aligned with body (forward-facing stereo rig).
     and mounted ``camera_height`` meters above the ground plane.
     """
     fx, fy, cx, cy = intrinsics

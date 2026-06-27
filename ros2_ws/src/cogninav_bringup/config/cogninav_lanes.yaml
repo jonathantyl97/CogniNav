@@ -4,7 +4,7 @@
     odom_topic: "/cogninav/odom"
     lane_markers_topic: "/cogninav/lane_markers"
     map_frame: "map"
-    # EuRoC cam0 defaults — override per dataset / vehicle
+    # Default camera intrinsics — override per rig.
     fx: 458.654
     fy: 457.296
     cx: 367.215

@@ -56,12 +56,11 @@ Bags land in `~/Downloads/cogninav/`.
 After rig or calibration edits:
 
 ```bash
-./benchmarks/run_regression_suite.sh          # EuRoC + TUM-VI (if downloaded)
-./benchmarks/run_regression_suite.sh --quick  # EuRoC only
+./benchmarks/run_regression_suite.sh
 ```
 
 Phase 4 is complete when:
 
 1. Live SLAM initializes on the rig (odom + map points publishing).
 2. A warehouse rosbag is recorded.
-3. Open-dataset regression still passes.
+3. Warehouse regression (`run_regression_suite.sh`) still passes.

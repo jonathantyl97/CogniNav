@@ -5,7 +5,7 @@
     odom_topic: "/cogninav/odom"
     depth_points_topic: "/cogninav/stereo_points"
     map_frame: "map"
-    # EuRoC cam0 / cam1 (rectified bags) — override per dataset
+    # Default intrinsics — override per rig / warehouse bag.
     fx: 458.654
     fy: 457.296
     cx: 367.215

@@ -80,8 +80,13 @@ if [[ ! -f "$ORB_DIR/lib/libORB_SLAM3.so" ]]; then
 fi
 
 if [[ "$BUILD_RC" -ne 0 ]]; then
-  echo "==> ORB-SLAM3 examples had errors; building stereo_inertial_euroc for smoke test..."
-  cmake --build "$ORB_DIR/build" -j"$(nproc)" --target stereo_inertial_euroc
+  echo "==> ORB-SLAM3 examples had errors; building stereo-inertial example for smoke test..."
+  SI_TARGET="$(grep -oP 'add_executable\(\Kstereo_inertial\w+' "$ORB_DIR/CMakeLists.txt" | head -1)"
+  if [[ -z "$SI_TARGET" ]]; then
+    echo "ERROR: could not find stereo-inertial example target in ORB-SLAM3 CMakeLists.txt"
+    exit 1
+  fi
+  cmake --build "$ORB_DIR/build" -j"$(nproc)" --target "$SI_TARGET"
 fi
 
 echo "==> Installing Iridescence (pyridescence) + evo..."

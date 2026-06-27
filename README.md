@@ -22,6 +22,7 @@
 | SLAM core | [ORB-SLAM3](https://github.com/UZ-SLAMLab/ORB_SLAM3) (GPLv3), headless viewer |
 | Dense depth | OpenCV `StereoSGBM` |
 | Debug viewer | `cogninav_viz` + `pyridescence` |
+| Benchmarks | **Warehouse bags** (TorWIC) + live rig regression |
 
 ---
 
@@ -91,39 +92,38 @@ ros2 launch cogninav_bringup cogninav.launch.py
 ros2 launch cogninav_bringup cogninav.launch.py use_viz:=false
 ```
 
-### 5. EuRoC stereo-inertial (Phase 1)
+### 5. Warehouse datasets
+
+Two ROS 2 warehouse bags are supported:
+
+| Source | Scene | Download |
+|--------|-------|----------|
+| **TorWIC** | Real Clearpath warehouse (Azure Kinect stereo + IMU) | `./scripts/download_warehouse.sh --source torwic --seq aisle_cw_run_1` |
+| **r2b_storage** | NVIDIA storage/warehouse (RealSense D455 IR + IMU, native ROS 2) | `./scripts/download_warehouse.sh --source r2b` |
 
 ```bash
-./scripts/download_euroc.sh MH_01_easy
-./benchmarks/run_euroc_slam.sh --seq MH_01_easy
-# Live viz (Iridescence + camera panel):
-./scripts/run_euroc_viz.sh
+# TorWIC (real warehouse)
+./scripts/download_warehouse.sh --source torwic --seq aisle_cw_run_1
+./benchmarks/run_warehouse_slam.sh --source torwic --seq aisle_cw_run_1
+ros2 launch cogninav_bringup warehouse.launch.py
+
+# NVIDIA r2b_storage (synthetic storage scene, ~2.9 GB)
+./scripts/download_warehouse.sh --source r2b
+./benchmarks/run_warehouse_slam.sh --source r2b
+ros2 launch cogninav_bringup r2b_storage.launch.py
 ```
 
-### 6. TUM-VI + KITTI (Phase 2)
-
-```bash
-# TUM-VI stereo-inertial
-./scripts/download_tumvi.sh dataset-room1_512_16
-./scripts/download_tumvi_gt.sh dataset-room1_512_16   # optional, for ATE
-./benchmarks/run_tumvi_slam.sh --seq dataset-room1_512_16
-
-# KITTI stereo (sequence 00)
-./scripts/download_kitti.sh 00
-./benchmarks/run_kitti_slam.sh --seq 00
-```
-
-### 7. ROS 2 Humble parity (Phase 3)
+### 6. ROS 2 Humble parity (Phase 3)
 
 ```bash
 ./docker/cogninav_humble.sh          # first time: create container
 ./benchmarks/run_humble_smoke.sh --workspace-only
-./benchmarks/run_humble_smoke.sh --seq MH_01_easy
+./benchmarks/run_humble_smoke.sh --seq aisle_cw_run_1
 ```
 
 See `docker/HUMBLE.md` for Jazzy vs Humble ORB rebuild notes.
 
-### 8. Live stereo rig (Phase 4)
+### 7. Live stereo rig (Phase 4)
 
 ```bash
 # 1. Start camera driver (see docker/LIVE_RIG.md)
@@ -140,20 +140,14 @@ ros2 launch realsense2_camera rs_launch.py enable_infra1:=true enable_infra2:=tr
 ./benchmarks/run_regression_suite.sh
 ```
 
-### 8. Warehouse dataset (TorWIC)
+### 8. Smoke test
 
 ```bash
-./scripts/download_warehouse.sh --seq aisle_cw_run_1
-ros2 launch cogninav_bringup warehouse.launch.py
-```
-
-### 9. Phase 0 smoke test
-
-```bash
-./scripts/smoke_euroc.sh --workspace-only
-# Full EuRoC SLAM smoke (after downloading MH_01_easy):
-./scripts/download_euroc.sh MH_01_easy
-./scripts/smoke_euroc.sh
+./scripts/smoke_warehouse.sh --workspace-only
+# TorWIC SLAM smoke:
+./scripts/smoke_warehouse.sh --source torwic --seq aisle_cw_run_1
+# r2b_storage SLAM smoke (smaller, native ROS 2):
+./scripts/smoke_warehouse.sh --source r2b
 ```
 
 ---
@@ -163,7 +157,7 @@ ros2 launch cogninav_bringup warehouse.launch.py
 ```
 CogniNav/
   docker/              # Jazzy / Humble container scripts + Dockerfile
-  scripts/             # setup_deps, EuRoC download, smoke tests
+  scripts/             # setup_deps, warehouse download, smoke tests
   ros2_ws/src/         # ROS 2 packages
   benchmarks/          # eval harness + results/
   third_party/         # ORB_SLAM3 (cloned by setup_deps, not in git)
@@ -176,11 +170,11 @@ CogniNav/
 
 | Phase | Goal | Gate |
 |-------|------|------|
-| **0** | Docker + workspace + ORB build | `colcon build`, EuRoC smoke |
-| **1** | EuRoC stereo-inertial SLAM + viz | ATE within 2x paper on 5+ sequences (MH_01 smoke done) |
-| **2** | TUM-VI + KITTI stereo | Same wrapper; smoke + ATE on default sequences |
-| **3** | Humble parity | EuRoC smoke in `ros2_humble_cogninav` |
-| **4** | Live stereo rig + warehouse bag | Live SLAM + regression suite still passes |
+| **0** | Docker + workspace + ORB build | `colcon build`, warehouse smoke |
+| **1** | Warehouse SLAM + viz | TorWIC bag trajectory smoke |
+| **2** | Perception stack on warehouse replay | Lanes + depth + dynamics on bag |
+| **3** | Humble parity | Warehouse smoke in `ros2_humble_cogninav` |
+| **4** | Live stereo rig + warehouse bag | Live SLAM + regression suite passes |
 
 Details: [`plan.md`](plan.md)
 
@@ -192,7 +186,7 @@ Details: [`plan.md`](plan.md)
 |------|-------|
 | Wrapper source | Adapted from [zang09/ORB_SLAM3_ROS2](https://github.com/zang09/ORB_SLAM3_ROS2) |
 | Jazzy patches | `scripts/patch_orb_jazzy.sh` (OpenCV 4.6, GCC 13, C++17) |
-| Datasets | [EuRoC MAV](https://projects.asl.ethz.ch/datasets/euroc-mav/), TUM-VI, KITTI (stereo only) |
+| Warehouse data | [TorWIC-SLAM](https://github.com/Viky397/TorWICDataset) (real), [NVIDIA r2b_storage](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/isaac/resources/r2bdataset2023) (ROS 2 native) |
 | Evaluation | [evo](https://github.com/MichaelGrupp/evo) via `benchmarks/run_benchmark.sh` |
 
 ---

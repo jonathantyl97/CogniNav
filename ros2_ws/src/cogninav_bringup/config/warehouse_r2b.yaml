@@ -1,0 +1,19 @@
+# NVIDIA r2b_storage — RealSense D455 IR stereo + IMU (native ROS 2 bag).
+# Bag: ./scripts/download_warehouse.sh --source r2b
+
+/cogninav_vslam:
+  ros__parameters:
+    slam_mode: "stereo_inertial"
+    vocabulary: "/root/cogninav/third_party/ORB_SLAM3/Vocabulary/ORBvoc.txt"
+    settings: "/root/cogninav/ros2_ws/src/cogninav_bringup/config/orb_r2b_d455.yaml"
+    do_rectify: false
+    do_equalize: false
+    frame_id: "map"
+    camera_frame: "d455_1_left_ir_optical_frame"
+    left_image_topic: "d455_1_left_ir_image"
+    right_image_topic: "d455_1_right_ir_image"
+    imu_topic: "d455_1_imu"
+    trajectory_path: "/tmp/cogninav_r2b_trajectory.txt"
+    publish_tf: true
+    map_publish_hz: 5.0
+    max_map_points_publish: 50000

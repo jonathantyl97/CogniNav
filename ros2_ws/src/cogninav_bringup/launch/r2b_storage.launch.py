@@ -8,7 +8,7 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description() -> LaunchDescription:
     pkg = FindPackageShare("cogninav_bringup")
-    tumvi_params = PathJoinSubstitution([pkg, "config", "tumvi.yaml"])
+    r2b_params = PathJoinSubstitution([pkg, "config", "warehouse_r2b.yaml"])
     viz_params = PathJoinSubstitution([pkg, "config", "cogninav_viz.yaml"])
 
     bag_path = LaunchConfiguration("bag_path")
@@ -18,10 +18,9 @@ def generate_launch_description() -> LaunchDescription:
 
     return LaunchDescription(
         [
-            DeclareLaunchArgument("seq", default_value="dataset-room1_512_16"),
             DeclareLaunchArgument(
                 "bag_path",
-                default_value="/root/Downloads/tumvi/dataset-room1_512_16_ros2",
+                default_value="/root/Downloads/warehouse/r2b_storage",
             ),
             DeclareLaunchArgument("rate", default_value="1.0"),
             DeclareLaunchArgument("use_viz", default_value="true"),
@@ -35,7 +34,7 @@ def generate_launch_description() -> LaunchDescription:
                 package="cogninav_vslam",
                 executable="orb_slam3_node",
                 name="cogninav_vslam",
-                parameters=[tumvi_params, {"use_sim_time": use_sim_time}],
+                parameters=[r2b_params, {"use_sim_time": use_sim_time}],
                 output="screen",
             ),
             ExecuteProcess(

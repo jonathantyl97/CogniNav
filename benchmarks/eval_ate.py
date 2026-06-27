@@ -36,9 +36,9 @@ def main() -> int:
 
     if args.smoke_status:
         result["status"] = args.smoke_status
-        result["note"] = args.smoke_note or "Phase 0 smoke: ORB-SLAM3 native EuRoC run + workspace build."
+        result["note"] = args.smoke_note or "Smoke: ORB-SLAM3 + workspace build."
     else:
-        result["note"] = "Wire cogninav_vslam trajectory export in Phase 1."
+        result["note"] = "Wire cogninav_vslam trajectory export for ATE evaluation."
 
     if args.traj and args.gt:
         try:

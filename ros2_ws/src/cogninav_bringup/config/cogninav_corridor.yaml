@@ -1,6 +1,6 @@
 /cogninav_corridor_monitor:
   ros__parameters:
-    # Uses left stereo image by default (EuRoC cam0).
+    # Left stereo image topic — override per rig / bag.
     image_topic: "/cam0/image_raw"
     odom_topic: "/cogninav/odom"
     lane_markers_topic: "/cogninav/lane_markers"

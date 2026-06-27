@@ -55,7 +55,7 @@ Warehouses are **dynamic spaces**: pickers, forklifts, pallets, doors opening. C
 on public datasets. Private warehouse rosbags are for dynamic-scene validation.
 
 **Non-goals:**
-- Highway / trucking AD, KITTI-as-primary benchmark
+- Highway / outdoor driving AD benchmarks as primary success metric
 - Monocular SLAM, RGB-D-only pipelines
 - DROID-SLAM, GLIM
 - Full Nav2 / MPC stack (we publish constraints; planner is separate)
@@ -150,7 +150,7 @@ In plain language:
 
 Design principles:
 
-- **Stereo only** — left + right image topics; EuRoC `cam0`/`cam1`, KITTI `image_02`/`image_03`
+- **Stereo only** — left + right image topics (`/cam0`, `/cam1` or rig-specific names)
 - **ROS 2** — Jazzy primary, Humble supported after Jazzy gate passes
 - **Standard messages** — `nav_msgs/Odometry`, `geometry_msgs/PoseStamped`, TF,
   `sensor_msgs/PointCloud2` (map points)
@@ -169,10 +169,10 @@ Design principles:
 
 ### 4.2 ORB-SLAM3 — stereo modes only
 
-| Mode | Datasets | ORB setting |
+| Mode | Use case | ORB setting |
 |------|----------|-------------|
-| **Stereo-inertial** (default) | EuRoC, TUM-VI | `STEREO_INERTIAL` |
-| **Stereo** | KITTI | `STEREO` |
+| **Stereo-inertial** (default) | TorWIC warehouse, live rig with IMU | `STEREO_INERTIAL` |
+| **Stereo** | Stereo-only bags (no IMU) | `STEREO` |
 
 Mono (`MONOCULAR`, `IMU_MONOCULAR`) is **out of scope**.
 
@@ -248,7 +248,7 @@ CogniNav/
   third_party/
     ORB_SLAM3/                # submodule
   ros2_ws/src/
-    cogninav_bringup/       # launch files, EuRoC/KITTI configs
+    cogninav_bringup/       # launch files, warehouse + rig configs
     cogninav_vslam/         # ORB-SLAM3 ROS 2 wrapper (fork or vendored)
     cogninav_depth/         # stereo SGBM dense depth
     cogninav_lanes/         # lanes + in-corridor dynamic detection
@@ -260,22 +260,18 @@ CogniNav/
     results/                  # committed JSON + plots
   scripts/
     setup_deps.sh             # build ORB-SLAM3 + pyridescence in container
-    download_euroc.sh
-    download_tumvi.sh         # TUM-VI eval ROS bags
-    download_tumvi_gt.sh      # optional GT for ATE
-    download_kitti.sh         # KITTI odometry seq + poses
-    bag_from_euroc.sh
-    bag_from_kitti.sh
-    run_euroc_viz.sh          # EuRoC SLAM + Iridescence (X11)
+    download_warehouse.sh     # TorWIC + NVIDIA r2b_storage
+    smoke_warehouse.sh
+    run_live_viz.sh
+    record_rig_bag.sh
   benchmarks/
     run_benchmark.sh
-    run_euroc_slam.sh         # Phase 1
-    run_tumvi_slam.sh         # Phase 2
-    run_kitti_slam.sh         # Phase 2
-    euroc_gt_to_tum.py
-    tumvi_gt_to_tum.py
-    kitti_gt_to_tum.py
-    bag_convert.sh            # ROS1→ROS2 bag helper
+    run_warehouse_slam.sh
+    run_humble_smoke.sh
+    run_regression_suite.sh
+    eval_ate.py               # evo ATE/RPE
+    configs/                  # per-sequence YAML + calib
+    results/                  # committed JSON + plots
 ```
 
 ---
@@ -286,11 +282,11 @@ CogniNav/
 
 | Dataset | Role for AMR project |
 |---------|----------------------|
-| **EuRoC / TUM-VI** | Stereo-inertial SLAM regression (lab) |
-| **KITTI** | Optional stereo sanity check (not warehouse) |
-| **Own warehouse rosbag** | **Primary** gate for aisle keeping + dynamics |
+| **TorWIC-SLAM** | Real Clearpath warehouse — primary regression |
+| **NVIDIA r2b_storage** | Native ROS 2 storage/warehouse scene — fast CI smoke |
+| **Own warehouse rosbag** | Live rig validation, dynamics, aisle keeping |
 
-Excluded: mono sequences, highway-only AD benchmarks as primary success metric.
+Excluded: mono sequences, highway/outdoor driving benchmarks as primary success metric.
 
 ### 6.2 Metrics ([evo](https://github.com/MichaelGrupp/evo))
 - **ATE RMSE** (primary)
@@ -302,15 +298,15 @@ Excluded: mono sequences, highway-only AD benchmarks as primary success metric.
 
 | Phase | Gate | Status |
 |-------|------|--------|
-| **0** | Docker builds; `colcon build` succeeds; smoke run EuRoC `MH_01` | **Done** |
-| **1** | EuRoC: ATE within **2×** published ORB-SLAM3 paper on ≥ 5 sequences | **In progress** — `MH_01_easy` smoke + trajectory OK; multi-seq ATE pending full GT |
-| **2** | TUM-VI stereo-inertial + KITTI stereo | Same wrapper; smoke + ATE on default sequences |
-| **3** | Humble container: same EuRoC smoke test passes (parity) | **Done** — workspace + `MH_01_easy` trajectory (3659 poses) |
-| **4** | Own camera rig + rosbag; open-dataset gates still pass | **Started** — `live.launch.py`, RealSense/ZED presets, record + regression scripts |
+| **0** | Docker builds; `colcon build` succeeds; warehouse smoke | **Done** |
+| **1** | TorWIC warehouse SLAM + viz | **Done** — `aisle_cw_run_1` trajectory smoke |
+| **2** | Perception on warehouse replay | **In progress** — lanes + depth + dynamics on bag |
+| **3** | Humble container: warehouse smoke passes (parity) | **Done** — workspace + trajectory in `ros2_humble_cogninav` |
+| **4** | Own camera rig + rosbag; warehouse regression still passes | **Started** — `live.launch.py`, RealSense/ZED presets, record + regression scripts |
 
 ### 6.4 Reproducibility
-- `benchmarks/run_benchmark.sh --dataset euroc --seq MH_01`
-- Commit results: `benchmarks/results/<date>_euroc_MH01.json`
+- `benchmarks/run_benchmark.sh --dataset warehouse --seq aisle_cw_run_1`
+- Commit results: `benchmarks/results/<date>_warehouse_<seq>.json`
 - Record Docker image tag + git SHA in each result file
 
 ---
@@ -323,51 +319,33 @@ Excluded: mono sequences, highway-only AD benchmarks as primary success metric.
 - `cogninav_viz` ROS 2 package (Iridescence viewer)
 - Fork/vend ORB-SLAM3 ROS 2 wrapper into `cogninav_vslam`
 - `colcon build` in `ros2_ws`
-- `benchmarks/run_benchmark.sh` skeleton + EuRoC download script
+- `benchmarks/run_benchmark.sh` skeleton + warehouse download script
 
-### Phase 1 — EuRoC stereo-inertial ✅ (core complete)
+### Phase 1 — Warehouse SLAM ✅
 
 **Delivered:**
 - `orb_slam3_node` — stereo-inertial SLAM, `/cogninav/odom`, `/cogninav/map_points`, TF, TUM trajectory on shutdown
-- `euroc.launch.py` + `euroc.yaml`; `benchmarks/run_euroc_slam.sh`
+- `warehouse.launch.py` + `r2b_storage.launch.py`; TorWIC + NVIDIA r2b configs; `benchmarks/run_warehouse_slam.sh`
 - `cogninav_viz` — Iridescence 3D map + trajectory + in-window camera panel (`update_image`)
-- Map point accumulation for denser visualization; `scripts/run_euroc_viz.sh` (X11)
+- Map point accumulation for denser visualization
 
-**Verified:** `MH_01_easy` smoke — trajectory saved (2456 poses), benchmark JSON in `benchmarks/results/`.
+**Verified:** TorWIC `aisle_cw_run_1` smoke — trajectory saved, benchmark JSON in `benchmarks/results/`.
 
-**Remaining for full gate:** ATE on ≥ 5 EuRoC sequences (needs `mav0` GT + ETH/HuggingFace bags).
-
-### Phase 2 — TUM-VI + KITTI 🔄 (in progress)
+### Phase 2 — Perception on warehouse replay 🔄 (in progress)
 
 **Delivered:**
-- `tumvi.yaml` + `tumvi.launch.py` — stereo-inertial, ORB `TUM-VI.yaml`, topics `/cam0`, `/cam1`, `/imu0`
-- `kitti.yaml` + `kitti.launch.py` — stereo-only (`slam_mode: stereo`), ORB `KITTI00-02.yaml`
-- `cogninav_vslam::syncStereo()` — KITTI path without IMU
-- `scripts/download_tumvi.sh`, `download_tumvi_gt.sh`, `download_kitti.sh`, `bag_from_kitti.sh`
-- `benchmarks/run_tumvi_slam.sh`, `run_kitti_slam.sh`, GT converters
+- `cogninav_depth`, `cogninav_lanes`, `cogninav_viz` on warehouse topic layout
+- Compressed image republish in `warehouse.launch.py`
 
-**Gate:** smoke trajectory on default sequences (`dataset-room1_512_16`, KITTI `00`); ATE when GT/poses available.
+**Gate:** full stack runs on TorWIC bag replay with lanes + depth publishing.
 
-**Next:** run benchmarks in Docker; tune KITTI settings file per sequence (`KITTI03`, `KITTI04-12`); add TUM-VI room2+ sequences.
-
-### Phase 3 — Humble parity 🔄 (in progress)
-
-**Delivered:**
-- `docker/cogninav_humble.sh` — persistent Humble container + X11 (matches Jazzy script)
-- `scripts/patch_orb_humble.sh` — ORB-SLAM3 patches for Ubuntu 22.04 / OpenCV 4.5
-- `setup_deps.sh` — auto-selects Jazzy vs Humble patch script
-- `benchmarks/run_humble_smoke.sh` — EuRoC workspace + SLAM smoke in Humble (auto `docker exec`)
-- `docker/HUMBLE.md` — Jazzy vs Humble differences
-
-**Gate:** `colcon build` + EuRoC `MH_01_easy` trajectory smoke in `ros2_humble_cogninav`.
-
-**Note:** Rebuild `third_party/ORB_SLAM3` inside each distro container (shared mount, not ABI-portable).
+**Next:** tune intrinsics in `orb_torwic_azure.yaml`; validate corridor monitor on warehouse movers.
 
 ### Phase 3 — Humble parity ✅
 
 **Delivered:** `cogninav_humble.sh`, `patch_orb_humble.sh`, `sanitize_ros2_bag_for_humble.py`, `run_humble_smoke.sh`, `cv_bridge_compat.hpp`.
 
-**Verified:** `colcon build` + EuRoC `MH_01_easy` (3659 poses) in `ros2_humble_cogninav`.
+**Verified:** `colcon build` + warehouse trajectory smoke in `ros2_humble_cogninav`.
 
 ### Phase 4 — Live stereo rig 🔄 (in progress)
 
@@ -376,7 +354,7 @@ Excluded: mono sequences, highway-only AD benchmarks as primary success metric.
 - `config/realsense_d455.yaml`, `config/zed2.yaml` — topics + depth/lane intrinsics
 - `config/orb_realsense_d455.yaml`, `config/orb_zed2.yaml` — ORB settings templates (tune per unit)
 - `scripts/run_live_viz.sh`, `scripts/record_rig_bag.sh`
-- `benchmarks/run_regression_suite.sh` — EuRoC + TUM-VI after rig/calibration changes
+- `benchmarks/run_regression_suite.sh` — warehouse SLAM after rig/calibration changes
 - `docker/LIVE_RIG.md`
 
 **Gate:** live SLAM initializes on rig; warehouse rosbag recorded; `./benchmarks/run_regression_suite.sh` passes.
@@ -408,12 +386,8 @@ Excluded: mono sequences, highway-only AD benchmarks as primary success metric.
 5. `./benchmarks/run_regression_suite.sh` after calibration edits
 
 **Phase 2 (remaining):**
-1. `./benchmarks/run_tumvi_slam.sh --seq dataset-room1_512_16`
-2. `./scripts/download_kitti.sh 00` then `./benchmarks/run_kitti_slam.sh --seq 00`
-
-**Phase 1 (finish gate):**
-1. Download ≥ 5 EuRoC sequences with `mav0` GT
-2. `./benchmarks/run_euroc_slam.sh` on each; check ATE ≤ 2× paper baseline
+1. Run full stack on TorWIC bag: `ros2 launch cogninav_bringup warehouse.launch.py use_viz:=true`
+2. Tune lane/depth params for warehouse lighting and floor lines
 
 **Always:**
 1. Start container: `./docker/cogninav_jazzy.sh`
@@ -429,7 +403,7 @@ Excluded: mono sequences, highway-only AD benchmarks as primary success metric.
 - ORB-SLAM3 on Jazzy/24.04: [HackMD guide](https://hackmd.io/@dennis40816/rJqjMi6tJe)
 - Eval: [evo](https://github.com/MichaelGrupp/evo)
 - Iridescence: [koide3/iridescence](https://github.com/koide3/iridescence)
-- Datasets: EuRoC, TUM-VI, KITTI
+- Warehouse data: [TorWIC-SLAM](https://github.com/Viky397/TorWICDataset), [NVIDIA r2b_storage](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/isaac/resources/r2bdataset2023)
 
 ---
 

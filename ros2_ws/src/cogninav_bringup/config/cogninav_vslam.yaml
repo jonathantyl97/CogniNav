@@ -2,7 +2,7 @@
   ros__parameters:
     slam_mode: "stereo_inertial"
     vocabulary: "/root/cogninav/third_party/ORB_SLAM3/Vocabulary/ORBvoc.txt"
-    settings: "/root/cogninav/third_party/ORB_SLAM3/Examples/Stereo-Inertial/EuRoC.yaml"
+    settings: "/root/cogninav/ros2_ws/src/cogninav_bringup/config/orb_realsense_d455.yaml"
     do_rectify: false
     do_equalize: false
     use_viewer: false

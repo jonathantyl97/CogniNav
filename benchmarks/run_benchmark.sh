@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Run open-dataset evaluation (Phase 0: smoke metadata; Phase 1+: ATE/RPE).
+# Run benchmark evaluation (smoke metadata or ATE/RPE when GT is available).
 #
 # Usage:
-#   ./benchmarks/run_benchmark.sh --dataset euroc --seq MH_01_easy
+#   ./benchmarks/run_benchmark.sh --dataset warehouse --seq aisle_cw_run_1
 #
-# Writes: benchmarks/results/<timestamp>_euroc_<seq>.json
+# Writes: benchmarks/results/<timestamp>_warehouse_<seq>.json
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DATASET="euroc"
-SEQ="MH_01_easy"
+DATASET="warehouse"
+SEQ="aisle_cw_run_1"
 EXTRA_ARGS=()
 
 while [[ $# -gt 0 ]]; do

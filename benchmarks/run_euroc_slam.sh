@@ -11,6 +11,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=benchmarks/cogninav_docker.sh
+source "$ROOT/benchmarks/cogninav_docker.sh"
+cogninav_reexec_in_docker "benchmarks/run_euroc_slam.sh" "$@"
+
 SEQ="MH_01_easy"
 RATE="1.0"
 TIMEOUT_SEC="${SLAM_TIMEOUT_SEC:-600}"
@@ -23,9 +27,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-EUROC_DIR="${EUROC_DIR:-/root/Downloads/euroc}"
+EUROC_DIR="${EUROC_DIR:-$(cogninav_downloads_dir)/euroc}"
 BAG_RAW="$EUROC_DIR/${SEQ}.bag"
-BAG_ROS2="$EUROC_DIR/${SEQ}_ros2"
+BAG_ROS2="$EUROC_DIR/${SEQ}_ros2_$(cogninav_ros_distro)"
 MAV0="$EUROC_DIR/$SEQ/mav0"
 PLAY_BAG=""
 TRAJ="/tmp/cogninav_euroc_trajectory.txt"
@@ -35,16 +39,18 @@ HAVE_GT=false
 if [[ -d "$BAG_RAW" ]]; then
   PLAY_BAG="$BAG_RAW"
 elif [[ -f "$BAG_RAW" ]]; then
-  if [[ -d "$BAG_ROS2" ]]; then
-    echo "==> Using existing ROS 2 bag: $BAG_ROS2"
-    PLAY_BAG="$BAG_ROS2"
+  if PLAY_BAG="$(cogninav_resolve_ros2_bag "$SEQ" "$EUROC_DIR" "$ROOT" 2>/dev/null)"; then
+    echo "==> Using ROS 2 bag: $PLAY_BAG"
   else
     echo "==> Converting ROS 1 bag to ROS 2: $BAG_RAW"
     rosbags-convert \
       --src "$BAG_RAW" \
       --dst "$BAG_ROS2" \
       --src-typestore ros1_noetic \
-      --dst-typestore ros2_jazzy
+      --dst-typestore "ros2_$(cogninav_ros_distro)"
+    if [[ "$(cogninav_ros_distro)" == "humble" ]]; then
+      python3 "$ROOT/scripts/sanitize_ros2_bag_for_humble.py" "$BAG_ROS2"
+    fi
     PLAY_BAG="$BAG_ROS2"
   fi
 else
@@ -53,7 +59,7 @@ else
 fi
 
 set +u
-source /opt/ros/jazzy/setup.bash
+cogninav_ros_setup
 set -u
 cd "$ROOT/ros2_ws"
 colcon build --packages-select cogninav_vslam cogninav_bringup cogninav_viz
@@ -98,24 +104,26 @@ if [[ "$LINES" -lt 10 ]]; then
 fi
 
 GIT_SHA="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+PHASE="${COGNINAV_BENCHMARK_PHASE:-1}"
+DOCKER_IMAGE="$(cogninav_docker_image)"
 if [[ "$HAVE_GT" == true ]]; then
   "$ROOT/benchmarks/run_benchmark.sh" \
     --dataset euroc \
     --seq "$SEQ" \
-    --phase 1 \
+    --phase "$PHASE" \
     --git-sha "$GIT_SHA" \
-    --docker-image "${COGNINAV_JAZZY_IMAGE:-osrf/ros:jazzy-desktop-full}" \
+    --docker-image "$DOCKER_IMAGE" \
     --traj "$TRAJ" \
     --gt "$GT"
 else
   "$ROOT/benchmarks/run_benchmark.sh" \
     --dataset euroc \
     --seq "$SEQ" \
-    --phase 1 \
+    --phase "$PHASE" \
     --git-sha "$GIT_SHA" \
-    --docker-image "${COGNINAV_JAZZY_IMAGE:-osrf/ros:jazzy-desktop-full}" \
+    --docker-image "$DOCKER_IMAGE" \
     --smoke-status "ok" \
     --smoke-note "SLAM trajectory saved ($LINES poses); ATE skipped (no mav0 GT)."
 fi
 
-echo "==> Phase 1 test complete for $SEQ"
+echo "==> EuRoC SLAM test complete for $SEQ (phase $PHASE)"

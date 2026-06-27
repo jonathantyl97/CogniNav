@@ -8,8 +8,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=benchmarks/cogninav_docker.sh
+source "$ROOT/benchmarks/cogninav_docker.sh"
 SEQ="${EUROC_SEQ:-MH_01_easy}"
-EUROC_DIR="${EUROC_DIR:-/root/Downloads/euroc}"
+EUROC_DIR="${EUROC_DIR:-$(cogninav_downloads_dir)/euroc}"
 ORB_DIR="$ROOT/third_party/ORB_SLAM3"
 ORB_LIB="$ORB_DIR/lib/libORB_SLAM3.so"
 WORKSPACE_ONLY=false
@@ -28,9 +30,18 @@ if [[ ! -f "$ORB_LIB" ]]; then
   exit 1
 fi
 
-set +u
-source /opt/ros/jazzy/setup.bash
-set -u
+if [[ -f "$ROOT/benchmarks/cogninav_docker.sh" ]]; then
+  set +u
+  cogninav_ros_setup
+  set -u
+  DOCKER_IMAGE="$(cogninav_docker_image)"
+else
+  set +u
+  source /opt/ros/jazzy/setup.bash
+  set -u
+  DOCKER_IMAGE="${COGNINAV_JAZZY_IMAGE:-osrf/ros:jazzy-desktop-full}"
+fi
+
 cd "$ROOT/ros2_ws"
 colcon build
 set +u
@@ -38,7 +49,6 @@ source install/setup.bash
 set -u
 
 GIT_SHA="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
-DOCKER_IMAGE="${COGNINAV_JAZZY_IMAGE:-osrf/ros:jazzy-desktop-full}"
 
 record_result() {
   local status="$1"

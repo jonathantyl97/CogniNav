@@ -7,6 +7,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=benchmarks/cogninav_docker.sh
+source "$ROOT/benchmarks/cogninav_docker.sh"
+cogninav_reexec_in_docker "benchmarks/run_tumvi_slam.sh" "$@"
+
 # shellcheck source=benchmarks/bag_convert.sh
 source "$ROOT/benchmarks/bag_convert.sh"
 
@@ -22,27 +26,28 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-TUMVI_DIR="${TUMVI_DIR:-/root/Downloads/tumvi}"
+TUMVI_DIR="${TUMVI_DIR:-$(cogninav_downloads_dir)/tumvi}"
 BAG_RAW="$TUMVI_DIR/${SEQ}.bag"
-BAG_ROS2="$TUMVI_DIR/${SEQ}_ros2"
+BAG_ROS2="$TUMVI_DIR/${SEQ}_ros2_$(cogninav_ros_distro)"
 GT_SRC="$TUMVI_DIR/groundtruth/${SEQ}.txt"
 TRAJ="/tmp/cogninav_tumvi_trajectory.txt"
 GT="/tmp/cogninav_tumvi_${SEQ}_gt.txt"
 HAVE_GT=false
 
-if [[ -d "$BAG_ROS2" ]]; then
-  PLAY_BAG="$BAG_ROS2"
+if PLAY_BAG="$(cogninav_resolve_ros2_bag "$SEQ" "$TUMVI_DIR" "$ROOT" 2>/dev/null)"; then
+  :
 elif [[ -f "$BAG_RAW" ]]; then
-  PLAY_BAG="$(convert_ros1_bag_if_needed "$BAG_RAW" "$BAG_ROS2")"
+  PLAY_BAG="$(convert_ros1_bag_if_needed "$BAG_RAW" "$BAG_ROS2" "$(cogninav_ros_distro)")"
 elif [[ -d "$BAG_RAW" ]]; then
   PLAY_BAG="$BAG_RAW"
 else
-  echo "Missing bag — run: ./scripts/download_tumvi.sh ${SEQ%.bag}"
+  echo "Missing bag at $BAG_RAW or $BAG_ROS2"
+  echo "Run: ./scripts/download_tumvi.sh ${SEQ%.bag}"
   exit 1
 fi
 
 set +u
-source /opt/ros/jazzy/setup.bash
+cogninav_ros_setup
 set -u
 cd "$ROOT/ros2_ws"
 colcon build --packages-select cogninav_vslam cogninav_bringup cogninav_viz
@@ -79,13 +84,13 @@ if [[ "$HAVE_GT" == true ]]; then
   "$ROOT/benchmarks/run_benchmark.sh" \
     --dataset tumvi --seq "$SEQ" --phase 2 \
     --git-sha "$GIT_SHA" \
-    --docker-image "${COGNINAV_JAZZY_IMAGE:-osrf/ros:jazzy-desktop-full}" \
+    --docker-image "$(cogninav_docker_image)" \
     --traj "$TRAJ" --gt "$GT"
 else
   "$ROOT/benchmarks/run_benchmark.sh" \
     --dataset tumvi --seq "$SEQ" --phase 2 \
     --git-sha "$GIT_SHA" \
-    --docker-image "${COGNINAV_JAZZY_IMAGE:-osrf/ros:jazzy-desktop-full}" \
+    --docker-image "$(cogninav_docker_image)" \
     --smoke-status "ok" \
     --smoke-note "TUM-VI trajectory saved ($LINES poses); ATE skipped (no GT file)."
 fi

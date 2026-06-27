@@ -25,6 +25,18 @@ apt-get install -y --no-install-recommends \
 
 mkdir -p "$THIRD_PARTY"
 
+if [[ -f /opt/ros/humble/setup.bash ]]; then
+  ORB_PATCH="$ROOT/scripts/patch_orb_humble.sh"
+  ROS_DISTRO_DETECTED="humble"
+elif [[ -f /opt/ros/jazzy/setup.bash ]]; then
+  ORB_PATCH="$ROOT/scripts/patch_orb_jazzy.sh"
+  ROS_DISTRO_DETECTED="jazzy"
+else
+  ORB_PATCH="$ROOT/scripts/patch_orb_jazzy.sh"
+  ROS_DISTRO_DETECTED="unknown"
+fi
+echo "    ROS distro: $ROS_DISTRO_DETECTED"
+
 if [[ ! -d "$ORB_DIR/.git" ]]; then
   echo "==> Cloning ORB-SLAM3..."
   git clone --recursive "$ORB_REPO" "$ORB_DIR"
@@ -36,7 +48,7 @@ else
   echo "==> ORB-SLAM3 already present at $ORB_DIR"
 fi
 
-"$ROOT/scripts/patch_orb_jazzy.sh" "$ORB_DIR"
+"$ORB_PATCH" "$ORB_DIR"
 
 # Clean partial builds after patch changes.
 rm -rf "$ORB_DIR/build" "$ORB_DIR/Thirdparty/"{DBoW2,g2o,Sophus}/build
@@ -73,7 +85,11 @@ if [[ "$BUILD_RC" -ne 0 ]]; then
 fi
 
 echo "==> Installing Iridescence (pyridescence) + evo..."
-pip3 install --break-system-packages \
+PIP_EXTRA=()
+if pip3 install --help 2>/dev/null | grep -q break-system-packages; then
+  PIP_EXTRA+=(--break-system-packages)
+fi
+pip3 install "${PIP_EXTRA[@]}" \
   pyridescence \
   evo numpy scipy
 

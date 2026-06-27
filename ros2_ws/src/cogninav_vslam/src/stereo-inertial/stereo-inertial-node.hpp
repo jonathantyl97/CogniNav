@@ -5,7 +5,7 @@
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 
-#include <cv_bridge/cv_bridge.hpp>
+#include <cogninav/cv_bridge_compat.hpp>
 
 #include "System.h"
 #include "Frame.h"

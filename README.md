@@ -8,7 +8,7 @@
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/SLAM-ORB--SLAM3-blue?style=flat-square" alt="ORB-SLAM3"></a>
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/sensors-stereo_only-555?style=flat-square" alt="Stereo only"></a>
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/viz-Iridescence-6C5CE7?style=flat-square" alt="Iridescence"></a>
-  <a href="https://github.com/jonathantyl97/CogniNav/blob/main/plan.md"><img src="https://img.shields.io/badge/status-Phase_2-2ea44f?style=flat-square" alt="Phase 2"></a>
+  <a href="https://github.com/jonathantyl97/CogniNav/blob/main/plan.md"><img src="https://img.shields.io/badge/status-Phase_4-2ea44f?style=flat-square" alt="Phase 4"></a>
 </p>
 
 ---
@@ -113,7 +113,41 @@ ros2 launch cogninav_bringup cogninav.launch.py use_viz:=false
 ./benchmarks/run_kitti_slam.sh --seq 00
 ```
 
-### 7. Phase 0 smoke test
+### 7. ROS 2 Humble parity (Phase 3)
+
+```bash
+./docker/cogninav_humble.sh          # first time: create container
+./benchmarks/run_humble_smoke.sh --workspace-only
+./benchmarks/run_humble_smoke.sh --seq MH_01_easy
+```
+
+See `docker/HUMBLE.md` for Jazzy vs Humble ORB rebuild notes.
+
+### 8. Live stereo rig (Phase 4)
+
+```bash
+# 1. Start camera driver (see docker/LIVE_RIG.md)
+ros2 launch realsense2_camera rs_launch.py enable_infra1:=true enable_infra2:=true \
+  enable_gyro:=true enable_accel:=true unite_imu_method:=2
+
+# 2. CogniNav + Iridescence
+./scripts/run_live_viz.sh --rig realsense_d455
+
+# 3. Record warehouse bag
+./scripts/record_rig_bag.sh --rig realsense_d455 --name warehouse_aisle1
+
+# 4. Regression after calibration changes
+./benchmarks/run_regression_suite.sh
+```
+
+### 8. Warehouse dataset (TorWIC)
+
+```bash
+./scripts/download_warehouse.sh --seq aisle_cw_run_1
+ros2 launch cogninav_bringup warehouse.launch.py
+```
+
+### 9. Phase 0 smoke test
 
 ```bash
 ./scripts/smoke_euroc.sh --workspace-only
@@ -145,8 +179,8 @@ CogniNav/
 | **0** | Docker + workspace + ORB build | `colcon build`, EuRoC smoke |
 | **1** | EuRoC stereo-inertial SLAM + viz | ATE within 2x paper on 5+ sequences (MH_01 smoke done) |
 | **2** | TUM-VI + KITTI stereo | Same wrapper; smoke + ATE on default sequences |
-| **3** | Humble parity | EuRoC smoke on 22.04 |
-| **4** | Live stereo rig + warehouse bag | Open-dataset regression still passes |
+| **3** | Humble parity | EuRoC smoke in `ros2_humble_cogninav` |
+| **4** | Live stereo rig + warehouse bag | Live SLAM + regression suite still passes |
 
 Details: [`plan.md`](plan.md)
 

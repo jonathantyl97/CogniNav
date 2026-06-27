@@ -9,7 +9,7 @@
 #include <thread>
 #include <unordered_map>
 
-#include <cv_bridge/cv_bridge.hpp>
+#include <cogninav/cv_bridge_compat.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>

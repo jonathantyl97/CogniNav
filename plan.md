@@ -304,9 +304,9 @@ Excluded: mono sequences, highway-only AD benchmarks as primary success metric.
 |-------|------|--------|
 | **0** | Docker builds; `colcon build` succeeds; smoke run EuRoC `MH_01` | **Done** |
 | **1** | EuRoC: ATE within **2×** published ORB-SLAM3 paper on ≥ 5 sequences | **In progress** — `MH_01_easy` smoke + trajectory OK; multi-seq ATE pending full GT |
-| **2** | TUM-VI stereo-inertial + KITTI stereo with same `orb_slam3_node` | **Started** — configs, launches, download/benchmark scripts |
-| **3** | Humble container: same EuRoC smoke test passes (parity) | Not started |
-| **4** | Own camera rig + rosbag; open-dataset gates still pass | Not started |
+| **2** | TUM-VI stereo-inertial + KITTI stereo | Same wrapper; smoke + ATE on default sequences |
+| **3** | Humble container: same EuRoC smoke test passes (parity) | **Done** — workspace + `MH_01_easy` trajectory (3659 poses) |
+| **4** | Own camera rig + rosbag; open-dataset gates still pass | **Started** — `live.launch.py`, RealSense/ZED presets, record + regression scripts |
 
 ### 6.4 Reproducibility
 - `benchmarks/run_benchmark.sh --dataset euroc --seq MH_01`
@@ -350,13 +350,38 @@ Excluded: mono sequences, highway-only AD benchmarks as primary success metric.
 
 **Next:** run benchmarks in Docker; tune KITTI settings file per sequence (`KITTI03`, `KITTI04-12`); add TUM-VI room2+ sequences.
 
-### Phase 3 — Humble parity (optional)
-- Repeat EuRoC smoke in `ros2_humble_dev` or `cogninav_humble.sh`
-- Document any Jazzy vs Humble CMake/OpenCV differences
+### Phase 3 — Humble parity 🔄 (in progress)
 
-### Phase 4 — Live stereo rig
-- Zed / RealSense D4xx stereo (+ IMU if available)
-- Record stereo rosbag; validate against open-dataset regression suite
+**Delivered:**
+- `docker/cogninav_humble.sh` — persistent Humble container + X11 (matches Jazzy script)
+- `scripts/patch_orb_humble.sh` — ORB-SLAM3 patches for Ubuntu 22.04 / OpenCV 4.5
+- `setup_deps.sh` — auto-selects Jazzy vs Humble patch script
+- `benchmarks/run_humble_smoke.sh` — EuRoC workspace + SLAM smoke in Humble (auto `docker exec`)
+- `docker/HUMBLE.md` — Jazzy vs Humble differences
+
+**Gate:** `colcon build` + EuRoC `MH_01_easy` trajectory smoke in `ros2_humble_cogninav`.
+
+**Note:** Rebuild `third_party/ORB_SLAM3` inside each distro container (shared mount, not ABI-portable).
+
+### Phase 3 — Humble parity ✅
+
+**Delivered:** `cogninav_humble.sh`, `patch_orb_humble.sh`, `sanitize_ros2_bag_for_humble.py`, `run_humble_smoke.sh`, `cv_bridge_compat.hpp`.
+
+**Verified:** `colcon build` + EuRoC `MH_01_easy` (3659 poses) in `ros2_humble_cogninav`.
+
+### Phase 4 — Live stereo rig 🔄 (in progress)
+
+**Delivered:**
+- `launch/live.launch.py` — rig preset selector (`realsense_d455`, `zed2`)
+- `config/realsense_d455.yaml`, `config/zed2.yaml` — topics + depth/lane intrinsics
+- `config/orb_realsense_d455.yaml`, `config/orb_zed2.yaml` — ORB settings templates (tune per unit)
+- `scripts/run_live_viz.sh`, `scripts/record_rig_bag.sh`
+- `benchmarks/run_regression_suite.sh` — EuRoC + TUM-VI after rig/calibration changes
+- `docker/LIVE_RIG.md`
+
+**Gate:** live SLAM initializes on rig; warehouse rosbag recorded; `./benchmarks/run_regression_suite.sh` passes.
+
+**Next:** calibrate intrinsics/extrinsics from `camera_info`; USB passthrough for Docker; warehouse bag replay launch.
 
 ---
 
@@ -375,12 +400,16 @@ Excluded: mono sequences, highway-only AD benchmarks as primary success metric.
 
 ## 9. Immediate Next Steps
 
-**Phase 2 (current):**
-1. `./scripts/download_tumvi.sh dataset-room1_512_16`
-2. `./scripts/download_tumvi_gt.sh dataset-room1_512_16` (optional ATE)
-3. `./benchmarks/run_tumvi_slam.sh --seq dataset-room1_512_16`
-4. `./scripts/download_kitti.sh 00` then `./benchmarks/run_kitti_slam.sh --seq 00`
-5. Viz: `ros2 launch cogninav_bringup tumvi.launch.py` or `./scripts/run_euroc_viz.sh` pattern for TUM-VI
+**Phase 4 (current):**
+1. Install camera driver on host (`realsense2_camera` or `zed_ros2_wrapper`) — see `docker/LIVE_RIG.md`
+2. `./scripts/run_live_viz.sh --rig realsense_d455` (or `zed2`)
+3. Tune `config/orb_<rig>.yaml` from `camera_info`
+4. `./scripts/record_rig_bag.sh --rig realsense_d455 --name warehouse_aisle1`
+5. `./benchmarks/run_regression_suite.sh` after calibration edits
+
+**Phase 2 (remaining):**
+1. `./benchmarks/run_tumvi_slam.sh --seq dataset-room1_512_16`
+2. `./scripts/download_kitti.sh 00` then `./benchmarks/run_kitti_slam.sh --seq 00`
 
 **Phase 1 (finish gate):**
 1. Download ≥ 5 EuRoC sequences with `mav0` GT

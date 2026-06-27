@@ -8,7 +8,7 @@
 #include "message_filters/synchronizer.h"
 #include "message_filters/sync_policies/approximate_time.h"
 
-#include <cv_bridge/cv_bridge.hpp>
+#include <cogninav/cv_bridge_compat.hpp>
 
 #include "System.h"
 #include "Frame.h"

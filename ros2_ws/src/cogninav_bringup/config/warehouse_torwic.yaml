@@ -1,0 +1,20 @@
+# TorWIC warehouse (Clearpath) — Azure Kinect stereo + IMU.
+# Bag: ./scripts/download_warehouse.sh --seq aisle_cw_run_1
+# Images are republished from compressed to /cam0, /cam1 in warehouse.launch.py
+
+/cogninav_vslam:
+  ros__parameters:
+    slam_mode: "stereo_inertial"
+    vocabulary: "/root/cogninav/third_party/ORB_SLAM3/Vocabulary/ORBvoc.txt"
+    settings: "/root/cogninav/ros2_ws/src/cogninav_bringup/config/orb_torwic_azure.yaml"
+    do_rectify: false
+    do_equalize: false
+    frame_id: "map"
+    camera_frame: "left_azure_rgb_camera_optical_frame"
+    left_image_topic: "/cam0/image_raw"
+    right_image_topic: "/cam1/image_raw"
+    imu_topic: "/left_azure/imu"
+    trajectory_path: "/tmp/cogninav_warehouse_trajectory.txt"
+    publish_tf: true
+    map_publish_hz: 5.0
+    max_map_points_publish: 50000

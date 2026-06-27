@@ -7,6 +7,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=benchmarks/cogninav_docker.sh
+source "$ROOT/benchmarks/cogninav_docker.sh"
+cogninav_reexec_in_docker "benchmarks/run_kitti_slam.sh" "$@"
 
 SEQ="00"
 RATE="1.0"
@@ -21,7 +24,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 SEQ="$(printf '%02d' "$((10#$SEQ))")"
-KITTI_DIR="${KITTI_DIR:-/root/Downloads/kitti}"
+KITTI_DIR="${KITTI_DIR:-$(cogninav_downloads_dir)/kitti}"
 PLAY_BAG="$KITTI_DIR/${SEQ}_ros2"
 SEQ_DIR="$KITTI_DIR/sequences/$SEQ"
 POSES="$KITTI_DIR/poses/${SEQ}.txt"
@@ -39,7 +42,7 @@ if [[ ! -d "$PLAY_BAG" ]]; then
 fi
 
 set +u
-source /opt/ros/jazzy/setup.bash
+cogninav_ros_setup
 set -u
 cd "$ROOT/ros2_ws"
 colcon build --packages-select cogninav_vslam cogninav_bringup cogninav_viz
@@ -76,13 +79,13 @@ if [[ "$HAVE_GT" == true ]]; then
   "$ROOT/benchmarks/run_benchmark.sh" \
     --dataset kitti --seq "$SEQ" --phase 2 \
     --git-sha "$GIT_SHA" \
-    --docker-image "${COGNINAV_JAZZY_IMAGE:-osrf/ros:jazzy-desktop-full}" \
+    --docker-image "$(cogninav_docker_image)" \
     --traj "$TRAJ" --gt "$GT"
 else
   "$ROOT/benchmarks/run_benchmark.sh" \
     --dataset kitti --seq "$SEQ" --phase 2 \
     --git-sha "$GIT_SHA" \
-    --docker-image "${COGNINAV_JAZZY_IMAGE:-osrf/ros:jazzy-desktop-full}" \
+    --docker-image "$(cogninav_docker_image)" \
     --smoke-status "ok" \
     --smoke-note "KITTI trajectory saved ($LINES poses); ATE skipped (no poses file)."
 fi

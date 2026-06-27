@@ -98,6 +98,8 @@ pip3 install "${PIP_EXTRA[@]}" \
   pyridescence \
   evo numpy scipy
 
+"$ROOT/scripts/download_models.sh"
+
 echo ""
 echo "Done."
 echo "  ORB-SLAM3 lib: $ORB_DIR/lib/libORB_SLAM3.so"

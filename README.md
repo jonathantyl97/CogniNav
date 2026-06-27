@@ -113,7 +113,18 @@ ros2 launch cogninav_bringup warehouse.launch.py
 ros2 launch cogninav_bringup r2b_storage.launch.py
 ```
 
-### 6. ROS 2 Humble parity (Phase 3)
+### 6. Full stack on warehouse replay (Phase 2)
+
+SLAM + dense depth + aisle lanes on bag replay:
+
+```bash
+./scripts/run_warehouse_viz.sh --seq aisle_cw_run_1          # SLAM + viz (light)
+./scripts/run_warehouse_viz.sh --seq aisle_cw_run_1 --full   # + depth + lanes
+./scripts/run_warehouse_viz.sh --seq aisle_cw_run_1 --headless
+./benchmarks/run_warehouse_perception.sh --source torwic
+```
+
+### 7. ROS 2 Humble parity (Phase 3)
 
 ```bash
 ./docker/cogninav_humble.sh          # first time: create container
@@ -123,7 +134,7 @@ ros2 launch cogninav_bringup r2b_storage.launch.py
 
 See `docker/HUMBLE.md` for Jazzy vs Humble ORB rebuild notes.
 
-### 7. Live stereo rig (Phase 4)
+### 8. Live stereo rig (Phase 4)
 
 ```bash
 # 1. Start camera driver (see docker/LIVE_RIG.md)

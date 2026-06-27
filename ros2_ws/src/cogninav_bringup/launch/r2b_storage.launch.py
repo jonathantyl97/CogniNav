@@ -9,11 +9,15 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description() -> LaunchDescription:
     pkg = FindPackageShare("cogninav_bringup")
     r2b_params = PathJoinSubstitution([pkg, "config", "warehouse_r2b.yaml"])
-    viz_params = PathJoinSubstitution([pkg, "config", "cogninav_viz.yaml"])
+    viz_base = PathJoinSubstitution([pkg, "config", "cogninav_viz.yaml"])
+    viz_r2b = PathJoinSubstitution([pkg, "config", "warehouse_viz_r2b.yaml"])
 
     bag_path = LaunchConfiguration("bag_path")
     rate = LaunchConfiguration("rate")
     use_viz = LaunchConfiguration("use_viz")
+    use_vslam = LaunchConfiguration("use_vslam")
+    use_depth = LaunchConfiguration("use_depth")
+    use_lanes = LaunchConfiguration("use_lanes")
     use_sim_time = LaunchConfiguration("use_sim_time")
 
     return LaunchDescription(
@@ -24,6 +28,9 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument("rate", default_value="1.0"),
             DeclareLaunchArgument("use_viz", default_value="true"),
+            DeclareLaunchArgument("use_vslam", default_value="true"),
+            DeclareLaunchArgument("use_depth", default_value="true"),
+            DeclareLaunchArgument("use_lanes", default_value="true"),
             DeclareLaunchArgument("use_sim_time", default_value="true"),
             SetEnvironmentVariable(name="RCUTILS_COLORIZED_OUTPUT", value="1"),
             AppendEnvironmentVariable(
@@ -36,6 +43,23 @@ def generate_launch_description() -> LaunchDescription:
                 name="cogninav_vslam",
                 parameters=[r2b_params, {"use_sim_time": use_sim_time}],
                 output="screen",
+                condition=IfCondition(use_vslam),
+            ),
+            Node(
+                package="cogninav_depth",
+                executable="stereo_depth",
+                name="cogninav_depth",
+                parameters=[r2b_params, {"use_sim_time": use_sim_time}],
+                output="screen",
+                condition=IfCondition(use_depth),
+            ),
+            Node(
+                package="cogninav_lanes",
+                executable="corridor_monitor",
+                name="cogninav_corridor_monitor",
+                parameters=[r2b_params, {"use_sim_time": use_sim_time}],
+                output="screen",
+                condition=IfCondition(use_lanes),
             ),
             ExecuteProcess(
                 cmd=["ros2", "bag", "play", bag_path, "--clock", "-r", rate],
@@ -45,7 +69,7 @@ def generate_launch_description() -> LaunchDescription:
                 package="cogninav_viz",
                 executable="iridescence_viewer",
                 name="cogninav_viz",
-                parameters=[viz_params, {"use_sim_time": use_sim_time}],
+                parameters=[viz_base, viz_r2b, {"use_sim_time": use_sim_time}],
                 output="screen",
                 condition=IfCondition(use_viz),
             ),

@@ -2,6 +2,25 @@
 # Re-run a CogniNav benchmark script inside the Jazzy Docker container when
 # ROS 2 is not available on the host (Downloads are mounted at /root/Downloads).
 
+#!/usr/bin/env bash
+# Re-run a CogniNav benchmark script inside the Jazzy Docker container when
+# ROS 2 is not available on the host (Downloads are mounted at /root/Downloads).
+
+cogninav_prepare_docker_x11() {
+  local container="${1:-${COGNINAV_CONTAINER:-ros2_jazzy_cogninav}}"
+  if [[ -z "${DISPLAY:-}" ]]; then
+    echo "ERROR: DISPLAY is not set on the host (required for Iridescence)."
+    echo "Start a local X session, then run: ./docker/cogninav_jazzy.sh"
+    exit 1
+  fi
+  xhost +local:docker >/dev/null 2>&1 || xhost +local:root >/dev/null 2>&1 || true
+  docker start "$container" >/dev/null 2>&1 || true
+  local xauth="${XAUTHORITY:-$HOME/.Xauthority}"
+  if [[ -f "$xauth" ]]; then
+    docker cp "$xauth" "$container:/tmp/.docker.xauth" >/dev/null 2>&1 || true
+  fi
+}
+
 cogninav_reexec_in_docker() {
   local script_rel="$1"
   shift
@@ -20,14 +39,35 @@ cogninav_reexec_in_docker() {
     exit 1
   fi
 
-  docker start "$container" >/dev/null 2>&1 || true
   local quoted=""
   local arg
   for arg in "$@"; do
     quoted+=$(printf '%q' "$arg")" "
   done
+
+  local inner_env="export COGNINAV_IN_DOCKER=1"
+  inner_env+="; export RMW_FASTRTPS_USE_SHM=0"
+
+  if [[ "${COGNINAV_DOCKER_X11:-0}" == "1" ]]; then
+    cogninav_prepare_docker_x11 "$container"
+    inner_env+="; export DISPLAY=${DISPLAY:-}"
+    inner_env+="; export QT_X11_NO_MITSHM=1"
+    inner_env+="; export XDG_RUNTIME_DIR=/tmp/cogninav-runtime"
+    inner_env+="; export XAUTHORITY=/tmp/.docker.xauth"
+    inner_env+="; mkdir -p /tmp/cogninav-runtime && chmod 700 /tmp/cogninav-runtime"
+    exec docker exec -it \
+      -e DISPLAY="${DISPLAY:-}" \
+      -e QT_X11_NO_MITSHM=1 \
+      -e XDG_RUNTIME_DIR=/tmp/cogninav-runtime \
+      -e XAUTHORITY=/tmp/.docker.xauth \
+      -e RMW_FASTRTPS_USE_SHM=0 \
+      "$container" bash -lc \
+      "${inner_env}; cd /root/cogninav && ./${script_rel} ${quoted}"
+  fi
+
+  docker start "$container" >/dev/null 2>&1 || true
   exec docker exec "$container" bash -lc \
-    "export COGNINAV_IN_DOCKER=1; cd /root/cogninav && ./${script_rel} ${quoted}"
+    "${inner_env}; cd /root/cogninav && ./${script_rel} ${quoted}"
 }
 
 cogninav_downloads_dir() {

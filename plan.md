@@ -267,6 +267,8 @@ CogniNav/
   benchmarks/
     run_benchmark.sh
     run_warehouse_slam.sh
+    run_warehouse_perception.sh
+    wait_for_topics.sh
     run_humble_smoke.sh
     run_regression_suite.sh
     eval_ate.py               # evo ATE/RPE
@@ -334,12 +336,14 @@ Excluded: mono sequences, highway/outdoor driving benchmarks as primary success 
 ### Phase 2 — Perception on warehouse replay 🔄 (in progress)
 
 **Delivered:**
-- `cogninav_depth`, `cogninav_lanes`, `cogninav_viz` on warehouse topic layout
-- Compressed image republish in `warehouse.launch.py`
+- `cogninav_depth`, `cogninav_lanes`, `cogninav_viz` wired in `warehouse.launch.py` + `r2b_storage.launch.py`
+- `warehouse_torwic.yaml` / `warehouse_r2b.yaml` — SLAM + depth + corridor params
+- `benchmarks/run_warehouse_perception.sh` + `wait_for_topics.sh` — Phase 2 topic gate
+- `scripts/run_warehouse_viz.sh` — full stack + Iridescence on TorWIC bag
 
-**Gate:** full stack runs on TorWIC bag replay with lanes + depth publishing.
+**Gate:** `./benchmarks/run_warehouse_perception.sh` — odom, map_points, stereo_points, lane_markers publish.
 
-**Next:** tune intrinsics in `orb_torwic_azure.yaml`; validate corridor monitor on warehouse movers.
+**Next:** tune lane/depth intrinsics; enable object detection when MobileNet weights are available.
 
 ### Phase 3 — Humble parity ✅
 
@@ -378,16 +382,17 @@ Excluded: mono sequences, highway/outdoor driving benchmarks as primary success 
 
 ## 9. Immediate Next Steps
 
-**Phase 4 (current):**
+**Phase 2 (current):**
+1. `./scripts/run_warehouse_viz.sh --seq aisle_cw_run_1`
+2. `./benchmarks/run_warehouse_perception.sh --source torwic`
+3. Tune lane/depth params in `warehouse_torwic.yaml`
+
+**Phase 4:**
 1. Install camera driver on host (`realsense2_camera` or `zed_ros2_wrapper`) — see `docker/LIVE_RIG.md`
 2. `./scripts/run_live_viz.sh --rig realsense_d455` (or `zed2`)
 3. Tune `config/orb_<rig>.yaml` from `camera_info`
 4. `./scripts/record_rig_bag.sh --rig realsense_d455 --name warehouse_aisle1`
 5. `./benchmarks/run_regression_suite.sh` after calibration edits
-
-**Phase 2 (remaining):**
-1. Run full stack on TorWIC bag: `ros2 launch cogninav_bringup warehouse.launch.py use_viz:=true`
-2. Tune lane/depth params for warehouse lighting and floor lines
 
 **Always:**
 1. Start container: `./docker/cogninav_jazzy.sh`

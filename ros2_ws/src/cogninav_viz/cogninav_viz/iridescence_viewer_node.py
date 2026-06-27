@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 import rclpy
 from cv_bridge import CvBridge
+from rclpy.clock import Clock, ClockType
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
@@ -126,6 +127,7 @@ class IridescenceViewerNode(Node):
         self._in_lane_cars: list[np.ndarray] = []
         self._last_camera_frame: Optional[np.ndarray] = None
         self._dirty = False
+        self._camera_centered = False
 
         if self._enabled:
             if not _IRIDESCENCE_AVAILABLE:
@@ -134,12 +136,26 @@ class IridescenceViewerNode(Node):
                 )
                 self._enabled = False
             else:
-                self._viewer = guik.async_viewer(title=title)
-                self._viewer.enable_xy_grid()
-                self.get_logger().info(f"Iridescence viewer started ({title})")
+                try:
+                    self._viewer = guik.async_viewer(title=title)
+                    self._viewer.enable_xy_grid()
+                    self._viewer.use_orbit_camera_control(distance=12.0, theta=0.0, phi=-0.6)
+                    self.get_logger().info(f"Iridescence viewer started ({title})")
+                except Exception as exc:  # noqa: BLE001
+                    self.get_logger().error(
+                        f"Iridescence failed to start ({exc}). "
+                        "Check DISPLAY / X11 forwarding in Docker."
+                    )
+                    self._enabled = False
+                    self._viewer = None
 
         if self._enabled:
-            self.create_timer(1.0 / max(self._rate_hz, 1.0), self._flush_to_viewer)
+            wall_clock = Clock(clock_type=ClockType.STEADY_TIME)
+            self.create_timer(
+                1.0 / max(self._rate_hz, 1.0),
+                self._flush_to_viewer,
+                clock=wall_clock,
+            )
 
         self.create_subscription(PointCloud2, map_topic, self._on_map_points, 10)
         self.create_subscription(PointCloud2, stereo_topic, self._on_stereo_points, 10)
@@ -205,6 +221,9 @@ class IridescenceViewerNode(Node):
             self._trajectory.append(xyz)
             self._camera_xyz = tuple(xyz.tolist())
             self._dirty = True
+            if self._viewer is not None and not self._camera_centered:
+                self._viewer.lookat(xyz.reshape(3, 1).astype(np.float32))
+                self._camera_centered = True
 
     def _on_lane_markers(self, msg: MarkerArray) -> None:
         left: Optional[np.ndarray] = None

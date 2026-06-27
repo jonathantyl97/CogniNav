@@ -307,12 +307,6 @@ void CogniNavSlamNode::syncWithImu()
     if (std::abs(t_left - t_right) <= max_time_diff) {
       buf_mutex_.lock();
       if (!imu_buf_.empty() && t_left <= Utility::StampToSec(imu_buf_.back()->header.stamp)) {
-        im_left = getImage(img_left_buf_.front());
-        im_right = getImage(img_right_buf_.front());
-        stamp = img_left_buf_.front()->header.stamp;
-        img_left_buf_.pop();
-        img_right_buf_.pop();
-
         while (!imu_buf_.empty() && Utility::StampToSec(imu_buf_.front()->header.stamp) <= t_left) {
           const auto & imu = imu_buf_.front();
           const double t = Utility::StampToSec(imu->header.stamp);
@@ -325,7 +319,16 @@ void CogniNavSlamNode::syncWithImu()
             t);
           imu_buf_.pop();
         }
-        ready = !im_left.empty() && !im_right.empty();
+
+        // Do not consume stereo frames until IMU measurements exist for this time.
+        if (!imu_meas.empty()) {
+          im_left = getImage(img_left_buf_.front());
+          im_right = getImage(img_right_buf_.front());
+          stamp = img_left_buf_.front()->header.stamp;
+          img_left_buf_.pop();
+          img_right_buf_.pop();
+          ready = !im_left.empty() && !im_right.empty();
+        }
       }
       buf_mutex_.unlock();
     }

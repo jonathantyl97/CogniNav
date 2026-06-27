@@ -1,0 +1,4 @@
+/cogninav_viz:
+  ros__parameters:
+    camera_image_topic: "d455_1_left_ir_image"
+    camera_image_name: "camera/d455_left_ir"

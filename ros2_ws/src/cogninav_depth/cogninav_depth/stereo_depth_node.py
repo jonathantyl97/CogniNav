@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+import cv2
 import numpy as np
 import rclpy
 from cv_bridge import CvBridge
@@ -55,9 +56,14 @@ class StereoDepthNode(Node):
         self.declare_parameter("baseline_m", 0.11)
         self.declare_parameter("max_points", 30000)
         self.declare_parameter("sync_slop_sec", 0.05)
+        self.declare_parameter("max_image_width", 0)
+        self.declare_parameter("process_every_n", 1)
 
         self._map_frame = self.get_parameter("map_frame").get_parameter_value().string_value
         self._depth_topic = self.get_parameter("depth_points_topic").get_parameter_value().string_value
+        self._max_image_width = int(self.get_parameter("max_image_width").value)
+        self._process_every_n = max(1, int(self.get_parameter("process_every_n").value))
+        self._frame_count = 0
         self._estimator = StereoDepthEstimator(
             fx=float(self.get_parameter("fx").value),
             fy=float(self.get_parameter("fy").value),
@@ -90,12 +96,21 @@ class StereoDepthNode(Node):
     def _on_stereo_pair(self, left_msg: Image, right_msg: Image) -> None:
         if self._latest_odom is None:
             return
+        self._frame_count += 1
+        if self._frame_count % self._process_every_n != 0:
+            return
         try:
             left = self._bridge.imgmsg_to_cv2(left_msg, desired_encoding="bgr8")
             right = self._bridge.imgmsg_to_cv2(right_msg, desired_encoding="bgr8")
         except Exception as exc:  # noqa: BLE001
             self.get_logger().warn(f"cv_bridge failed: {exc}")
             return
+
+        if self._max_image_width > 0 and left.shape[1] > self._max_image_width:
+            scale = self._max_image_width / float(left.shape[1])
+            new_size = (self._max_image_width, int(left.shape[0] * scale))
+            left = cv2.resize(left, new_size, interpolation=cv2.INTER_AREA)
+            right = cv2.resize(right, new_size, interpolation=cv2.INTER_AREA)
 
         pts_c = self._estimator.compute_points(left, right)
         if pts_c is None:

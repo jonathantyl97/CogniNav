@@ -74,14 +74,18 @@ class CorridorMonitorNode(Node):
         )
         self._object_detector: Optional[MobileNetSsdDetector] = None
         if bool(self.get_parameter("enable_object_detection").value):
+            proto = self.get_parameter("mobilenet_prototxt").get_parameter_value().string_value
+            weights = self.get_parameter("mobilenet_weights").get_parameter_value().string_value
             try:
                 self._object_detector = MobileNetSsdDetector(
-                    self.get_parameter("mobilenet_prototxt").get_parameter_value().string_value,
-                    self.get_parameter("mobilenet_weights").get_parameter_value().string_value,
+                    proto,
+                    weights,
                     confidence_threshold=float(self.get_parameter("detection_confidence").value),
                 )
-            except FileNotFoundError as exc:
-                self.get_logger().error(str(exc))
+            except FileNotFoundError:
+                self.get_logger().warn(
+                    "MobileNet-SSD weights missing; in-lane object detection disabled."
+                )
 
         self._bridge = CvBridge()
         self._latest_odom: Optional[Odometry] = None

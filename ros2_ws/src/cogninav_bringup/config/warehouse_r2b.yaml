@@ -1,4 +1,4 @@
-# NVIDIA r2b_storage — RealSense D455 IR stereo + IMU (native ROS 2 bag).
+# NVIDIA r2b_storage — full CogniNav stack on native ROS 2 bag replay.
 # Bag: ./scripts/download_warehouse.sh --source r2b
 
 /cogninav_vslam:
@@ -13,7 +13,45 @@
     left_image_topic: "d455_1_left_ir_image"
     right_image_topic: "d455_1_right_ir_image"
     imu_topic: "d455_1_imu"
+    odom_topic: "/cogninav/odom"
     trajectory_path: "/tmp/cogninav_r2b_trajectory.txt"
     publish_tf: true
     map_publish_hz: 5.0
     max_map_points_publish: 50000
+
+/cogninav_depth:
+  ros__parameters:
+    left_image_topic: "d455_1_left_ir_image"
+    right_image_topic: "d455_1_right_ir_image"
+    odom_topic: "/cogninav/odom"
+    depth_points_topic: "/cogninav/stereo_points"
+    map_frame: "map"
+    fx: 770.0
+    fy: 770.0
+    cx: 640.0
+    cy: 360.0
+    baseline_m: 0.095
+    max_points: 30000
+    sync_slop_sec: 0.05
+
+/cogninav_corridor_monitor:
+  ros__parameters:
+    image_topic: "d455_1_left_ir_image"
+    odom_topic: "/cogninav/odom"
+    lane_markers_topic: "/cogninav/lane_markers"
+    in_lane_markers_topic: "/cogninav/in_lane_markers"
+    map_frame: "map"
+    fx: 770.0
+    fy: 770.0
+    cx: 640.0
+    cy: 360.0
+    camera_height: 0.5
+    ground_z: 0.0
+    process_width: 640
+    sample_points: 20
+    history_frames: 40
+    corridor_margin_px: 12.0
+    detection_confidence: 0.45
+    enable_object_detection: false
+    mobilenet_prototxt: "/root/cogninav/models/MobileNetSSD_deploy.prototxt"
+    mobilenet_weights: "/root/cogninav/models/MobileNetSSD_deploy.caffemodel"

@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import AppendEnvironmentVariable, DeclareLaunchArgument
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -16,9 +16,19 @@ def generate_launch_description() -> LaunchDescription:
     use_viz = LaunchConfiguration("use_viz")
     use_lanes = LaunchConfiguration("use_lanes")
     use_depth = LaunchConfiguration("use_depth")
+    use_vslam = LaunchConfiguration("use_vslam")
 
     return LaunchDescription(
         [
+            AppendEnvironmentVariable(
+                name="LD_LIBRARY_PATH",
+                value="/root/cogninav/third_party/ORB_SLAM3/lib:/usr/local/lib",
+            ),
+            DeclareLaunchArgument(
+                "use_vslam",
+                default_value="true",
+                description="Start ORB-SLAM3 stereo-inertial node",
+            ),
             DeclareLaunchArgument(
                 "use_viz",
                 default_value="true",
@@ -54,14 +64,14 @@ def generate_launch_description() -> LaunchDescription:
                 default_value=vslam_params,
                 description="ORB-SLAM3 stereo wrapper parameters",
             ),
-            # cogninav_vslam — stereo / stereo-inertial ORB-SLAM3 (Phase 1).
-            # Node(
-            #     package="cogninav_vslam",
-            #     executable="orb_slam3_node",
-            #     name="cogninav_vslam",
-            #     parameters=[LaunchConfiguration("vslam_params")],
-            #     output="screen",
-            # ),
+            Node(
+                package="cogninav_vslam",
+                executable="orb_slam3_node",
+                name="cogninav_vslam",
+                parameters=[LaunchConfiguration("vslam_params")],
+                output="screen",
+                condition=IfCondition(use_vslam),
+            ),
             Node(
                 package="cogninav_depth",
                 executable="stereo_depth",

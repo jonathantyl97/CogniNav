@@ -27,6 +27,8 @@ URLS=(
   "http://robotics.ethz.ch/~mavryang/datasets/ashlagonian/EuRoC/${SEQ}.zip"
 )
 
+HF_BAG_URL="https://huggingface.co/datasets/kavehsgh/EuRoC_MAV_Dataset_Machine_Hall_Easy_01/resolve/main/${SEQ}.bag"
+
 if [[ ! -f "$ZIP" ]]; then
   echo "Downloading EuRoC ${SEQ}..."
   downloaded=false
@@ -39,7 +41,13 @@ if [[ ! -f "$ZIP" ]]; then
     rm -f "$ZIP"
   done
   if [[ "$downloaded" != true ]]; then
-    echo "ERROR: could not download ${SEQ}. Fetch manually into $SEQ_DIR (need mav0/cam0/data)."
+    echo "  trying HuggingFace bag mirror"
+    if wget -c --timeout=60 --tries=2 "$HF_BAG_URL" -O "${SEQ}.bag"; then
+      echo "Downloaded ROS bag ${SEQ}.bag (convert or play directly)"
+      exit 0
+    fi
+    rm -f "${SEQ}.bag"
+    echo "ERROR: could not download ${SEQ}. Fetch manually into $SEQ_DIR (need mav0/cam0/data or ${SEQ}.bag)."
     exit 1
   fi
 fi

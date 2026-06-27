@@ -18,6 +18,9 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(OpenCV REQUIRED)
@@ -58,7 +61,15 @@ ament_target_dependencies(orb_slam3_stereo_inertial
   rclcpp sensor_msgs cv_bridge ORB_SLAM3 Pangolin)
 target_link_libraries(orb_slam3_stereo_inertial ${OpenCV_LIBS})
 
-install(TARGETS orb_slam3_stereo orb_slam3_stereo_inertial
+add_executable(orb_slam3_node
+  src/orb_slam3_node.cpp
+  src/cogninav_slam_node.cpp
+)
+ament_target_dependencies(orb_slam3_node
+  rclcpp sensor_msgs nav_msgs geometry_msgs tf2_ros cv_bridge ORB_SLAM3 Pangolin)
+target_link_libraries(orb_slam3_node ${OpenCV_LIBS})
+
+install(TARGETS orb_slam3_stereo orb_slam3_stereo_inertial orb_slam3_node
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

@@ -8,7 +8,7 @@
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/SLAM-ORB--SLAM3-blue?style=flat-square" alt="ORB-SLAM3"></a>
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/sensors-stereo_only-555?style=flat-square" alt="Stereo only"></a>
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/viz-Iridescence-6C5CE7?style=flat-square" alt="Iridescence"></a>
-  <a href="https://github.com/jonathantyl97/CogniNav/blob/main/plan.md"><img src="https://img.shields.io/badge/status-Phase_0-2ea44f?style=flat-square" alt="Phase 0"></a>
+  <a href="https://github.com/jonathantyl97/CogniNav/blob/main/plan.md"><img src="https://img.shields.io/badge/status-Phase_1-2ea44f?style=flat-square" alt="Phase 1"></a>
 </p>
 
 ---
@@ -91,7 +91,17 @@ ros2 launch cogninav_bringup cogninav.launch.py
 ros2 launch cogninav_bringup cogninav.launch.py use_viz:=false
 ```
 
-### 5. Phase 0 smoke test
+### 5. EuRoC stereo-inertial (Phase 1)
+
+```bash
+./scripts/download_euroc.sh MH_01_easy
+./scripts/bag_from_euroc.sh MH_01_easy
+ros2 launch cogninav_bringup euroc.launch.py seq:=MH_01_easy bag_path:=/root/Downloads/euroc/MH_01_easy.bag
+# ATE benchmark (needs bag + ground truth):
+./benchmarks/run_euroc_slam.sh --seq MH_01_easy
+```
+
+### 6. Phase 0 smoke test
 
 ```bash
 ./scripts/smoke_euroc.sh --workspace-only

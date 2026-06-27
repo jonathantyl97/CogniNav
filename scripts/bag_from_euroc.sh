@@ -41,6 +41,7 @@ from pathlib import Path
 
 import cv2
 import rclpy
+import rosbag2_py
 from rclpy.serialization import serialize_message
 from rosbag2_py import SequentialWriter, StorageOptions, TopicMetadata
 from sensor_msgs.msg import Image, Imu
@@ -135,8 +136,6 @@ def main():
 
 
 if __name__ == "__main__":
-    import rosbag2_py  # noqa: E402
-
     rclpy.init()
     try:
         main()

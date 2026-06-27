@@ -7,6 +7,7 @@
 #include <queue>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 #include <cv_bridge/cv_bridge.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
@@ -17,6 +18,8 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <tf2_ros/transform_broadcaster.h>
+
+#include <Eigen/Core>
 
 #include "System.h"
 #include "utility.hpp"
@@ -33,6 +36,7 @@ private:
   void grabImageRight(const sensor_msgs::msg::Image::SharedPtr msg);
   cv::Mat getImage(const sensor_msgs::msg::Image::SharedPtr & msg);
   void syncWithImu();
+  void syncStereo();
   void publishMapPoints();
   void publishPose(const Sophus::SE3f & twc, const rclcpp::Time & stamp);
 
@@ -67,6 +71,8 @@ private:
   std::string odom_topic_;
   std::string map_topic_;
   std::string trajectory_path_;
+  size_t max_map_points_publish_{50000};
+  std::unordered_map<unsigned long, Eigen::Vector3f> map_points_cache_;
 };
 
 #endif  // COGNINAV_SLAM_NODE_HPP_

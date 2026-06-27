@@ -8,7 +8,7 @@
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/SLAM-ORB--SLAM3-blue?style=flat-square" alt="ORB-SLAM3"></a>
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/sensors-stereo_only-555?style=flat-square" alt="Stereo only"></a>
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/viz-Iridescence-6C5CE7?style=flat-square" alt="Iridescence"></a>
-  <a href="https://github.com/jonathantyl97/CogniNav/blob/main/plan.md"><img src="https://img.shields.io/badge/status-Phase_1-2ea44f?style=flat-square" alt="Phase 1"></a>
+  <a href="https://github.com/jonathantyl97/CogniNav/blob/main/plan.md"><img src="https://img.shields.io/badge/status-Phase_2-2ea44f?style=flat-square" alt="Phase 2"></a>
 </p>
 
 ---
@@ -95,13 +95,25 @@ ros2 launch cogninav_bringup cogninav.launch.py use_viz:=false
 
 ```bash
 ./scripts/download_euroc.sh MH_01_easy
-./scripts/bag_from_euroc.sh MH_01_easy
-ros2 launch cogninav_bringup euroc.launch.py seq:=MH_01_easy bag_path:=/root/Downloads/euroc/MH_01_easy.bag
-# ATE benchmark (needs bag + ground truth):
 ./benchmarks/run_euroc_slam.sh --seq MH_01_easy
+# Live viz (Iridescence + camera panel):
+./scripts/run_euroc_viz.sh
 ```
 
-### 6. Phase 0 smoke test
+### 6. TUM-VI + KITTI (Phase 2)
+
+```bash
+# TUM-VI stereo-inertial
+./scripts/download_tumvi.sh dataset-room1_512_16
+./scripts/download_tumvi_gt.sh dataset-room1_512_16   # optional, for ATE
+./benchmarks/run_tumvi_slam.sh --seq dataset-room1_512_16
+
+# KITTI stereo (sequence 00)
+./scripts/download_kitti.sh 00
+./benchmarks/run_kitti_slam.sh --seq 00
+```
+
+### 7. Phase 0 smoke test
 
 ```bash
 ./scripts/smoke_euroc.sh --workspace-only
@@ -131,8 +143,8 @@ CogniNav/
 | Phase | Goal | Gate |
 |-------|------|------|
 | **0** | Docker + workspace + ORB build | `colcon build`, EuRoC smoke |
-| **1** | EuRoC stereo-inertial SLAM + viz | ATE within 2x paper on 5+ sequences |
-| **2** | TUM-VI + KITTI | Same wrapper, dataset configs |
+| **1** | EuRoC stereo-inertial SLAM + viz | ATE within 2x paper on 5+ sequences (MH_01 smoke done) |
+| **2** | TUM-VI + KITTI stereo | Same wrapper; smoke + ATE on default sequences |
 | **3** | Humble parity | EuRoC smoke on 22.04 |
 | **4** | Live stereo rig + warehouse bag | Open-dataset regression still passes |
 

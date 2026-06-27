@@ -47,7 +47,8 @@ CogniNavSlamNode::CogniNavSlamNode()
   this->declare_parameter<std::string>("odom_topic", "/cogninav/odom");
   this->declare_parameter<std::string>("map_points_topic", "/cogninav/map_points");
   this->declare_parameter<std::string>("trajectory_path", "/tmp/cogninav_trajectory.txt");
-  this->declare_parameter<double>("map_publish_hz", 2.0);
+  this->declare_parameter<double>("map_publish_hz", 5.0);
+  this->declare_parameter<int>("max_map_points_publish", 50000);
 
   std::string vocabulary;
   std::string settings;
@@ -72,6 +73,9 @@ CogniNavSlamNode::CogniNavSlamNode()
   this->get_parameter("map_points_topic", map_topic_);
   this->get_parameter("trajectory_path", trajectory_path_);
   this->get_parameter("map_publish_hz", map_hz);
+  int max_map_pts = 50000;
+  this->get_parameter("max_map_points_publish", max_map_pts);
+  max_map_points_publish_ = static_cast<size_t>(std::max(0, max_map_pts));
 
   use_imu_ = (slam_mode == "stereo_inertial" || slam_mode == "imu_stereo");
   ORB_SLAM3::System::eSensor sensor = use_imu_ ?
@@ -124,6 +128,8 @@ CogniNavSlamNode::CogniNavSlamNode()
     sub_imu_ = this->create_subscription<sensor_msgs::msg::Imu>(
       imu_topic, rclcpp::SensorDataQoS(), std::bind(&CogniNavSlamNode::grabImu, this, _1));
     sync_thread_ = std::thread(&CogniNavSlamNode::syncWithImu, this);
+  } else {
+    sync_thread_ = std::thread(&CogniNavSlamNode::syncStereo, this);
   }
 
   if (map_hz > 0.0) {
@@ -213,8 +219,15 @@ void CogniNavSlamNode::publishMapPoints()
     return;
   }
 
-  const auto map_points = slam_->GetTrackedMapPoints();
-  if (map_points.empty()) {
+  // Accumulate every observed map point (tracked-only is too sparse for visualization).
+  for (auto * mp : slam_->GetTrackedMapPoints()) {
+    if (!mp || mp->isBad()) {
+      continue;
+    }
+    map_points_cache_[mp->mnId] = mp->GetWorldPos();
+  }
+
+  if (map_points_cache_.empty()) {
     return;
   }
 
@@ -227,15 +240,17 @@ void CogniNavSlamNode::publishMapPoints()
   modifier.setPointCloud2FieldsByString(1, "xyz");
 
   std::vector<float> xyz;
-  xyz.reserve(map_points.size() * 3);
-  for (auto * mp : map_points) {
-    if (!mp || mp->isBad()) {
-      continue;
+  xyz.reserve(map_points_cache_.size() * 3);
+  size_t count = 0;
+  for (const auto & entry : map_points_cache_) {
+    if (max_map_points_publish_ > 0 && count >= max_map_points_publish_) {
+      break;
     }
-    const Eigen::Vector3f pos = mp->GetWorldPos();
+    const Eigen::Vector3f & pos = entry.second;
     xyz.push_back(pos.x());
     xyz.push_back(pos.y());
     xyz.push_back(pos.z());
+    ++count;
   }
 
   if (xyz.empty()) {
@@ -331,6 +346,66 @@ void CogniNavSlamNode::syncWithImu()
     }
 
     const Sophus::SE3f tcw = slam_->TrackStereo(im_left, im_right, t_left, imu_meas);
+    publishPose(tcw.inverse(), stamp);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+}
+
+void CogniNavSlamNode::syncStereo()
+{
+  const double max_time_diff = 0.01;
+
+  while (running_ && rclcpp::ok()) {
+    cv::Mat im_left;
+    cv::Mat im_right;
+    double t_left = 0.0;
+    rclcpp::Time stamp;
+    bool ready = false;
+
+    if (img_left_buf_.empty() || img_right_buf_.empty()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      continue;
+    }
+
+    buf_mutex_left_.lock();
+    buf_mutex_right_.lock();
+    t_left = Utility::StampToSec(img_left_buf_.front()->header.stamp);
+    double t_right = Utility::StampToSec(img_right_buf_.front()->header.stamp);
+
+    while ((t_left - t_right) > max_time_diff && img_right_buf_.size() > 1) {
+      img_right_buf_.pop();
+      t_right = Utility::StampToSec(img_right_buf_.front()->header.stamp);
+    }
+    while ((t_right - t_left) > max_time_diff && img_left_buf_.size() > 1) {
+      img_left_buf_.pop();
+      t_left = Utility::StampToSec(img_left_buf_.front()->header.stamp);
+    }
+
+    if (std::abs(t_left - t_right) <= max_time_diff) {
+      im_left = getImage(img_left_buf_.front());
+      im_right = getImage(img_right_buf_.front());
+      stamp = img_left_buf_.front()->header.stamp;
+      img_left_buf_.pop();
+      img_right_buf_.pop();
+      ready = !im_left.empty() && !im_right.empty();
+    }
+    buf_mutex_right_.unlock();
+    buf_mutex_left_.unlock();
+
+    if (!ready) {
+      continue;
+    }
+
+    if (do_equalize_) {
+      clahe_->apply(im_left, im_left);
+      clahe_->apply(im_right, im_right);
+    }
+    if (do_rectify_) {
+      cv::remap(im_left, im_left, m1l_, m2l_, cv::INTER_LINEAR);
+      cv::remap(im_right, im_right, m1r_, m2r_, cv::INTER_LINEAR);
+    }
+
+    const Sophus::SE3f tcw = slam_->TrackStereo(im_left, im_right, t_left);
     publishPose(tcw.inverse(), stamp);
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }

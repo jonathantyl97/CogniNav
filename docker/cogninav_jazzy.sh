@@ -10,8 +10,14 @@ DOWNLOADS_DIR="${DOWNLOADS_DIR:-$HOME/Downloads}"
 ROS_DOMAIN_ID_VALUE="${ROS_DOMAIN_ID:-100}"
 IMAGE="${COGNINAV_JAZZY_IMAGE:-osrf/ros:jazzy-desktop-full}"
 
+XAUTH="${XAUTHORITY:-$HOME/.Xauthority}"
+XAUTH_ARGS=()
+if [[ -f "$XAUTH" ]]; then
+  XAUTH_ARGS=(-v "$XAUTH:/tmp/.docker.xauth:ro" -e "XAUTHORITY=/tmp/.docker.xauth")
+fi
+
 echo "Configuring X11 forwarding..."
-xhost +local:root >/dev/null 2>&1 || true
+xhost +local:docker >/dev/null 2>&1 || xhost +local:root >/dev/null 2>&1 || true
 
 mkdir -p "$COGNINAV_DIR" "$DOWNLOADS_DIR"
 
@@ -21,7 +27,10 @@ if docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
   docker exec -it \
     -e ROS_DOMAIN_ID="$ROS_DOMAIN_ID_VALUE" \
     -e DISPLAY="$DISPLAY" \
-    "$CONTAINER_NAME" bash -lc 'source /opt/ros/jazzy/setup.bash; cd /root/cogninav; exec bash'
+    -e QT_X11_NO_MITSHM=1 \
+    -e XDG_RUNTIME_DIR=/tmp/cogninav-runtime \
+    "${XAUTH_ARGS[@]}" \
+    "$CONTAINER_NAME" bash -lc 'mkdir -p /tmp/cogninav-runtime && chmod 700 /tmp/cogninav-runtime; source /opt/ros/jazzy/setup.bash; cd /root/cogninav; exec bash'
 else
   echo "Creating container '$CONTAINER_NAME' from $IMAGE ..."
   docker run -it \
@@ -31,8 +40,10 @@ else
     --gpus all \
     -e DISPLAY="$DISPLAY" \
     -e QT_X11_NO_MITSHM=1 \
+    -e XDG_RUNTIME_DIR=/tmp/cogninav-runtime \
     -e ROS_DOMAIN_ID="$ROS_DOMAIN_ID_VALUE" \
     -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+    "${XAUTH_ARGS[@]}" \
     -v "$COGNINAV_DIR:/root/cogninav" \
     -v "$DOWNLOADS_DIR:/root/Downloads" \
     "$IMAGE" \

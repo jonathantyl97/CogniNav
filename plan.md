@@ -261,7 +261,21 @@ CogniNav/
   scripts/
     setup_deps.sh             # build ORB-SLAM3 + pyridescence in container
     download_euroc.sh
+    download_tumvi.sh         # TUM-VI eval ROS bags
+    download_tumvi_gt.sh      # optional GT for ATE
+    download_kitti.sh         # KITTI odometry seq + poses
     bag_from_euroc.sh
+    bag_from_kitti.sh
+    run_euroc_viz.sh          # EuRoC SLAM + Iridescence (X11)
+  benchmarks/
+    run_benchmark.sh
+    run_euroc_slam.sh         # Phase 1
+    run_tumvi_slam.sh         # Phase 2
+    run_kitti_slam.sh         # Phase 2
+    euroc_gt_to_tum.py
+    tumvi_gt_to_tum.py
+    kitti_gt_to_tum.py
+    bag_convert.sh            # ROS1→ROS2 bag helper
 ```
 
 ---
@@ -286,13 +300,13 @@ Excluded: mono sequences, highway-only AD benchmarks as primary success metric.
 
 ### 6.3 Phase gates
 
-| Phase | Gate |
-|-------|------|
-| **0** | Docker builds; `colcon build` succeeds; smoke run EuRoC `MH_01` |
-| **1** | EuRoC: ATE within **2×** published ORB-SLAM3 paper on ≥ 5 sequences |
-| **2** | TUM-VI + KITTI gates pass with same wrapper |
-| **3** | Humble container: same EuRoC smoke test passes (parity) |
-| **4** | Own camera rig + rosbag; open-dataset gates still pass |
+| Phase | Gate | Status |
+|-------|------|--------|
+| **0** | Docker builds; `colcon build` succeeds; smoke run EuRoC `MH_01` | **Done** |
+| **1** | EuRoC: ATE within **2×** published ORB-SLAM3 paper on ≥ 5 sequences | **In progress** — `MH_01_easy` smoke + trajectory OK; multi-seq ATE pending full GT |
+| **2** | TUM-VI stereo-inertial + KITTI stereo with same `orb_slam3_node` | **Started** — configs, launches, download/benchmark scripts |
+| **3** | Humble container: same EuRoC smoke test passes (parity) | Not started |
+| **4** | Own camera rig + rosbag; open-dataset gates still pass | Not started |
 
 ### 6.4 Reproducibility
 - `benchmarks/run_benchmark.sh --dataset euroc --seq MH_01`
@@ -311,15 +325,30 @@ Excluded: mono sequences, highway-only AD benchmarks as primary success metric.
 - `colcon build` in `ros2_ws`
 - `benchmarks/run_benchmark.sh` skeleton + EuRoC download script
 
-### Phase 1 — EuRoC stereo-inertial
-- Launch files for EuRoC sequences
-- Publish `/odom`, TF, map points
-- **Pass Phase 1 gate** on ≥ 5 EuRoC sequences
-- Iridescence smoke test: sparse map + trajectory visible in desktop viewer
+### Phase 1 — EuRoC stereo-inertial ✅ (core complete)
 
-### Phase 2 — TUM-VI + KITTI
-- Dataset configs + bag conversion
-- **Pass Phase 2 gate**
+**Delivered:**
+- `orb_slam3_node` — stereo-inertial SLAM, `/cogninav/odom`, `/cogninav/map_points`, TF, TUM trajectory on shutdown
+- `euroc.launch.py` + `euroc.yaml`; `benchmarks/run_euroc_slam.sh`
+- `cogninav_viz` — Iridescence 3D map + trajectory + in-window camera panel (`update_image`)
+- Map point accumulation for denser visualization; `scripts/run_euroc_viz.sh` (X11)
+
+**Verified:** `MH_01_easy` smoke — trajectory saved (2456 poses), benchmark JSON in `benchmarks/results/`.
+
+**Remaining for full gate:** ATE on ≥ 5 EuRoC sequences (needs `mav0` GT + ETH/HuggingFace bags).
+
+### Phase 2 — TUM-VI + KITTI 🔄 (in progress)
+
+**Delivered:**
+- `tumvi.yaml` + `tumvi.launch.py` — stereo-inertial, ORB `TUM-VI.yaml`, topics `/cam0`, `/cam1`, `/imu0`
+- `kitti.yaml` + `kitti.launch.py` — stereo-only (`slam_mode: stereo`), ORB `KITTI00-02.yaml`
+- `cogninav_vslam::syncStereo()` — KITTI path without IMU
+- `scripts/download_tumvi.sh`, `download_tumvi_gt.sh`, `download_kitti.sh`, `bag_from_kitti.sh`
+- `benchmarks/run_tumvi_slam.sh`, `run_kitti_slam.sh`, GT converters
+
+**Gate:** smoke trajectory on default sequences (`dataset-room1_512_16`, KITTI `00`); ATE when GT/poses available.
+
+**Next:** run benchmarks in Docker; tune KITTI settings file per sequence (`KITTI03`, `KITTI04-12`); add TUM-VI room2+ sequences.
 
 ### Phase 3 — Humble parity (optional)
 - Repeat EuRoC smoke in `ros2_humble_dev` or `cogninav_humble.sh`
@@ -346,11 +375,21 @@ Excluded: mono sequences, highway-only AD benchmarks as primary success metric.
 
 ## 9. Immediate Next Steps
 
+**Phase 2 (current):**
+1. `./scripts/download_tumvi.sh dataset-room1_512_16`
+2. `./scripts/download_tumvi_gt.sh dataset-room1_512_16` (optional ATE)
+3. `./benchmarks/run_tumvi_slam.sh --seq dataset-room1_512_16`
+4. `./scripts/download_kitti.sh 00` then `./benchmarks/run_kitti_slam.sh --seq 00`
+5. Viz: `ros2 launch cogninav_bringup tumvi.launch.py` or `./scripts/run_euroc_viz.sh` pattern for TUM-VI
+
+**Phase 1 (finish gate):**
+1. Download ≥ 5 EuRoC sequences with `mav0` GT
+2. `./benchmarks/run_euroc_slam.sh` on each; check ATE ≤ 2× paper baseline
+
+**Always:**
 1. Start container: `./docker/cogninav_jazzy.sh`
-2. Inside container: `./scripts/setup_deps.sh` then `cd ros2_ws && colcon build`
-3. Vendor ORB-SLAM3 ROS 2 wrapper into `cogninav_vslam` (`bUseViewer=false`)
-4. Run `ros2 launch cogninav_bringup cogninav.launch.py` (needs X11 / DISPLAY)
-5. EuRoC `MH_01` smoke test — first benchmark result in `benchmarks/results/`
+2. Build: `cd ros2_ws && colcon build && source install/setup.bash`
+3. Commit benchmark JSON to `benchmarks/results/` after each gate run
 
 ---
 

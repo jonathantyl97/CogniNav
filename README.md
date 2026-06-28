@@ -8,7 +8,7 @@
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/SLAM-ORB--SLAM3-blue?style=flat-square" alt="ORB-SLAM3"></a>
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/sensors-stereo_only-555?style=flat-square" alt="Stereo only"></a>
   <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/viz-Iridescence-6C5CE7?style=flat-square" alt="Iridescence"></a>
-  <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/status-Phase_6-2ea44f?style=flat-square" alt="Phase 6"></a>
+  <a href="https://github.com/jonathantyl97/CogniNav"><img src="https://img.shields.io/badge/status-complete-2ea44f?style=flat-square" alt="Complete"></a>
 </p>
 
 ---
@@ -35,28 +35,72 @@
 
 ## Quick start
 
-### 1. Container
+No camera required. Uses the **r2b_storage** warehouse bag (~2.9 GB).
+
+**Prerequisites:** Docker, Linux host with X11 (for the 3D viewer). GPU helps but is not required.
+
+### First time (host)
 
 ```bash
-./docker/cogninav_jazzy.sh
+git clone https://github.com/jonathantyl97/CogniNav.git
+cd CogniNav
+./docker/cogninav_jazzy.sh          # starts persistent container ros2_jazzy_cogninav
 ```
 
-### 2. Build ORB-SLAM3 + workspace (first time, inside container)
+### First time (inside container)
 
 ```bash
+docker exec -it ros2_jazzy_cogninav bash
 cd /root/cogninav
-./docker/setup_deps.sh
-cd ros2_ws && source /opt/ros/jazzy/setup.bash && colcon build && source install/setup.bash
+./docker/setup_deps.sh              # ORB-SLAM3 + Pangolin + pyridescence (~15 min)
+cd ros2_ws
+source /opt/ros/jazzy/setup.bash
+colcon build
+source install/setup.bash
 ```
 
-### 3. Download a dataset (see [Datasets](#datasets) below)
+### Download the test bag (host or container)
 
-### 4. Run
+`~/Downloads` on the host is mounted at `/root/Downloads` in Docker.
 
 ```bash
-./scripts/run_warehouse_viz.sh --source r2b --full --build   # warehouse (default)
-./scripts/run_kitti_viz.sh --seq 00 --build                # road / lanes
+mkdir -p ~/Downloads/warehouse/r2b_storage
+cd ~/Downloads/warehouse/r2b_storage
+BASE=https://api.ngc.nvidia.com/v2/resources/nvidia/isaac/r2bdataset2023/versions/3/files/r2b_storage
+wget -O metadata.yaml "$BASE/metadata.yaml"
+wget -O r2b_storage_0.db3 "$BASE/r2b_storage_0.db3"
 ```
+
+### Run (from host repo root)
+
+Re-execs into Docker and opens **Iridescence** (map, trajectory, depth, lanes):
+
+```bash
+./scripts/run_warehouse_viz.sh --source r2b --full --build
+```
+
+| Flag | Effect |
+|------|--------|
+| `--full` | SLAM + dense depth + lane detection |
+| `--build` | `colcon build` before launch (first run) |
+| `--pangolin` | ORB-SLAM3 Pangolin viewer instead of Iridescence |
+| `--headless` | No GUI (topics only) |
+
+### Smoke test
+
+```bash
+./benchmarks/run_all_gates.sh --skip-humble
+```
+
+### Road dataset (optional)
+
+KITTI odometry needs a ~22 GB download — see [Datasets](#datasets). Then:
+
+```bash
+./scripts/run_kitti_viz.sh --seq 00 --build
+```
+
+More datasets, live camera, and benchmarks: sections below.
 
 ---
 
@@ -110,7 +154,7 @@ Then:
 
 ```bash
 ./scripts/run_warehouse_viz.sh --source r2b --full --build
-./benchmarks/run_dynamic_slam.sh --source r2b
+./benchmarks/run_gate.sh --stack --source r2b
 ```
 
 ### KITTI odometry (road lanes + outdoor stereo, ~22 GB)
@@ -134,7 +178,7 @@ Then:
 
 ```bash
 ./scripts/run_kitti_viz.sh --seq 00 --build
-./benchmarks/run_dynamic_slam.sh --source kitti --seq 00
+./benchmarks/run_gate.sh --stack --source kitti --seq 00
 ```
 
 ### TorWIC (optional warehouse, ~11 GB per sequence)
@@ -190,15 +234,14 @@ Dynamic mask: `corridor_monitor` publishes `/cogninav/dynamic_mask`; ORB-SLAM3 z
 
 | Script | Purpose |
 |--------|---------|
-| `benchmarks/smoke_warehouse.sh` | Workspace build smoke |
-| `benchmarks/run_warehouse_slam.sh` | ORB trajectory on bag |
-| `benchmarks/run_warehouse_perception.sh` | Perception topics gate |
-| `benchmarks/run_aisle_guidance.sh` | Aisle + dynamic outputs gate |
-| `benchmarks/run_dynamic_slam.sh` | Dynamic-mask SLAM gate |
-| `benchmarks/run_all_gates.sh` | Full automated gate suite |
+| `benchmarks/run_gate.sh` | Validation gates (`--workspace`, `--slam`, `--stack`, `--all`) |
+| `benchmarks/run_all_gates.sh` | Shortcut for `run_gate.sh --all` |
 
 ```bash
-./benchmarks/run_all_gates.sh
+./benchmarks/run_all_gates.sh              # workspace + SLAM + full stack (r2b)
+./benchmarks/run_gate.sh --slam --source r2b
+./benchmarks/run_gate.sh --stack --source kitti --seq 00
+./benchmarks/run_gate.sh --humble --workspace   # optional Humble container
 ```
 
 ---
@@ -224,6 +267,28 @@ CogniNav/
   benchmarks/          # gates, tools (bag_from_kitti, torwic calib)
   ros2_ws/src/         # ROS 2 packages
   models/              # MobileNet prototxt (weights optional)
+```
+
+---
+
+## Build phases (status)
+
+| Phase | Deliverable | Status |
+|-------|-------------|--------|
+| **0** | Docker, ORB-SLAM3, `colcon build` | Done |
+| **1** | Warehouse SLAM + trajectory on bag | Done (r2b) |
+| **2** | Depth + lanes + viz on bag replay | Done |
+| **3** | Humble parity smoke | Done (optional container) |
+| **4** | Live rig + rig bag replay | **Software done** — needs camera to validate |
+| **5** | Aisle guidance + dynamic detections | Done |
+| **6** | Dynamic-mask SLAM | Done |
+
+**You are done with the build plan** for everything testable without hardware. Remaining work is optional: live camera validation (Phase 4), KITTI 22 GB download for road testing, TorWIC if you want the real warehouse bag.
+
+Verify locally:
+
+```bash
+./benchmarks/run_all_gates.sh --skip-humble
 ```
 
 ---

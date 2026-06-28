@@ -26,8 +26,8 @@ cd ros2_ws && colcon build
 **Phase 3 gate** (from host):
 
 ```bash
-./benchmarks/run_humble_smoke.sh --workspace-only
-./benchmarks/run_humble_smoke.sh --seq aisle_cw_run_1
+./benchmarks/run_gate.sh --humble --workspace
+./benchmarks/run_gate.sh --humble --slam --source torwic --seq aisle_cw_run_1
 ```
 
 Same `orb_slam3_node` and launch files run on both distros; no `#ifdef` forks in application code.

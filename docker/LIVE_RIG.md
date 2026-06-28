@@ -67,13 +67,13 @@ Bags land in `~/Downloads/cogninav/`.
 After rig or calibration edits:
 
 ```bash
-./benchmarks/run_regression_suite.sh              # warehouse SLAM + perception (default: r2b)
-./benchmarks/run_regression_suite.sh --source torwic --seq aisle_cw_run_1
-./benchmarks/run_all_gates.sh                       # workspace + regression + optional Humble
+./benchmarks/run_gate.sh --slam --source r2b
+./benchmarks/run_gate.sh --stack --source torwic --seq aisle_cw_run_1
+./benchmarks/run_all_gates.sh                       # workspace + SLAM + stack + optional Humble
 ```
 
 Phase 4 is complete when:
 
 1. Live SLAM initializes on the rig (odom + map points publishing).
 2. A warehouse rosbag is recorded.
-3. Warehouse regression (`run_regression_suite.sh`) still passes.
+3. Warehouse gates (`run_gate.sh --slam` / `--stack`) still pass on r2b.

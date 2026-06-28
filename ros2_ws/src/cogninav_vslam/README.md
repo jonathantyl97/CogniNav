@@ -30,7 +30,7 @@ Stereo executables are adapted from [zang09/ORB_SLAM3_ROS2](https://github.com/z
 | `orb_slam3_stereo` | `System::STEREO` |
 | `orb_slam3_stereo_inertial` | `System::IMU_STEREO` |
 
-Build requires `third_party/ORB_SLAM3` from `./scripts/setup_deps.sh`.
+Build requires `third_party/ORB_SLAM3` from `./docker/setup_deps.sh`.
 
 ## Headless / Iridescence
 

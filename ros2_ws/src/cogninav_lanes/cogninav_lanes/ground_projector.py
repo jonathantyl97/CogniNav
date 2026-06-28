@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 import numpy as np
 from geometry_msgs.msg import Pose
 
@@ -63,3 +65,37 @@ def pixels_to_map_ground(
     if not points:
         return np.zeros((0, 3), dtype=np.float32)
     return np.vstack(points)
+
+
+def lateral_offset_m_on_ground(
+    pixel_a: tuple[float, float],
+    pixel_b: tuple[float, float],
+    intrinsics: tuple[float, float, float, float],
+    pose_map_body: Pose,
+    ground_z: float,
+    camera_height: float,
+) -> Optional[float]:
+    """
+    Signed lateral separation between two ground projections in the body frame.
+
+    Positive => point B is to the right of point A (robot should steer right to reach B).
+    """
+    pts = pixels_to_map_ground(
+        np.array([pixel_a, pixel_b], dtype=np.float32),
+        intrinsics,
+        pose_map_body,
+        ground_z,
+        camera_height,
+    )
+    if len(pts) < 2:
+        return None
+
+    r_wb = _quat_to_rot(
+        pose_map_body.orientation.x,
+        pose_map_body.orientation.y,
+        pose_map_body.orientation.z,
+        pose_map_body.orientation.w,
+    )
+    delta_map = pts[1] - pts[0]
+    delta_body = r_wb.T @ delta_map.astype(np.float64)
+    return float(-delta_body[1])

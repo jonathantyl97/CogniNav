@@ -50,7 +50,7 @@ case "$SOURCE" in
 esac
 
 if [[ ! -d "$PLAY_BAG" ]]; then
-  echo "Missing bag $PLAY_BAG — run: ./scripts/download_warehouse.sh --source $SOURCE --seq $SEQ"
+  echo "Missing bag $PLAY_BAG — see README.md (Datasets)"
   exit 1
 fi
 

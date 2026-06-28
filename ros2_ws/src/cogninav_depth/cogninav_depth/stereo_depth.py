@@ -39,7 +39,20 @@ class StereoDepthEstimator:
             mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY,
         )
 
-    def compute_points(self, left_bgr: np.ndarray, right_bgr: np.ndarray) -> Optional[np.ndarray]:
+    def compute_points(
+        self,
+        left_bgr: np.ndarray,
+        right_bgr: np.ndarray,
+        fx: Optional[float] = None,
+        fy: Optional[float] = None,
+        cx: Optional[float] = None,
+        cy: Optional[float] = None,
+    ) -> Optional[np.ndarray]:
+        fx = self._fx if fx is None else fx
+        fy = self._fy if fy is None else fy
+        cx = self._cx if cx is None else cx
+        cy = self._cy if cy is None else cy
+
         left = cv2.cvtColor(left_bgr, cv2.COLOR_BGR2GRAY)
         right = cv2.cvtColor(right_bgr, cv2.COLOR_BGR2GRAY)
         if left.shape != right.shape:
@@ -52,9 +65,9 @@ class StereoDepthEstimator:
         if not np.any(valid):
             return None
 
-        z = (self._fx * self._baseline) / disp[valid]
-        x = (u_coords[valid] - self._cx) * z / self._fx
-        y = (v_coords[valid] - self._cy) * z / self._fy
+        z = (fx * self._baseline) / disp[valid]
+        x = (u_coords[valid] - cx) * z / fx
+        y = (v_coords[valid] - cy) * z / fy
         pts = np.stack([x, y, z], axis=1).astype(np.float32)
 
         # Keep close, reliable depth for AD-style preview (0.5–40 m).

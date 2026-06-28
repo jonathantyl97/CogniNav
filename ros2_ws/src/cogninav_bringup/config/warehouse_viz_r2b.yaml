@@ -1,4 +1,30 @@
+# Lighter settings for r2b_storage interactive viz.
+
+/cogninav_vslam:
+  ros__parameters:
+    map_publish_hz: 2.0
+    max_map_points_publish: 12000
+
 /cogninav_viz:
   ros__parameters:
+    max_points: 12000
+    update_rate_hz: 10.0
+    point_scale: 2.5
+    stereo_point_scale: 1.5
+    show_stereo_depth: true
+    trajectory_max_waypoints: 800
+    camera_max_width: 360
+    show_camera_preview: true
     camera_image_topic: "d455_1_left_ir_image"
     camera_image_name: "camera/d455_left_ir"
+
+/cogninav_depth:
+  ros__parameters:
+    max_image_width: 640
+    max_points: 8000
+    process_every_n: 1
+
+/cogninav_corridor_monitor:
+  ros__parameters:
+    process_width: 480
+    history_frames: 20

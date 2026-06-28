@@ -5,17 +5,20 @@ from __future__ import annotations
 from collections import deque
 from typing import Deque, Optional
 
+import cv2
 import numpy as np
 import rclpy
 from cv_bridge import CvBridge
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, PointStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from sensor_msgs.msg import Image
+from vision_msgs.msg import Detection2DArray
 from visualization_msgs.msg import Marker, MarkerArray
 
-from cogninav_lanes.ground_projector import pixels_to_map_ground
-from cogninav_lanes.lane_corridor import point_in_lane_corridor
+from cogninav_lanes.dynamic_perception import build_dynamic_mask, detections_to_ros
+from cogninav_lanes.ground_projector import lateral_offset_m_on_ground, pixels_to_map_ground
+from cogninav_lanes.lane_corridor import corridor_bounds_at_y, corridor_lateral_offset_px, point_in_lane_corridor
 from cogninav_lanes.opencv_lane_detector import OpenCvLaneDetector
 from cogninav_lanes.opencv_object_detector import MobileNetSsdDetector, ObjectDetection, ObjectKind
 
@@ -51,11 +54,22 @@ class CorridorMonitorNode(Node):
             "/root/cogninav/models/MobileNetSSD_deploy.caffemodel",
         )
         self.declare_parameter("enable_object_detection", True)
+        self.declare_parameter("aisle_guidance_topic", "/cogninav/aisle_guidance")
+        self.declare_parameter("dynamic_detections_topic", "/cogninav/dynamic_detections")
+        self.declare_parameter("dynamic_mask_topic", "/cogninav/dynamic_mask")
+        self.declare_parameter("publish_dynamic_mask", True)
+        self.declare_parameter("publish_aisle_guidance", True)
+        self.declare_parameter("lookahead_row_frac", 0.82)
+        self.declare_parameter("guidance_frame", "map")
+        self.declare_parameter("dynamic_mask_dilate_px", 6)
 
         image_topic = self.get_parameter("image_topic").get_parameter_value().string_value
         odom_topic = self.get_parameter("odom_topic").get_parameter_value().string_value
         lane_topic = self.get_parameter("lane_markers_topic").get_parameter_value().string_value
         in_lane_topic = self.get_parameter("in_lane_markers_topic").get_parameter_value().string_value
+        guidance_topic = self.get_parameter("aisle_guidance_topic").get_parameter_value().string_value
+        dynamic_topic = self.get_parameter("dynamic_detections_topic").get_parameter_value().string_value
+        mask_topic = self.get_parameter("dynamic_mask_topic").get_parameter_value().string_value
         self._map_frame = self.get_parameter("map_frame").get_parameter_value().string_value
         self._intrinsics = (
             float(self.get_parameter("fx").value),
@@ -68,6 +82,11 @@ class CorridorMonitorNode(Node):
         self._sample_points = int(self.get_parameter("sample_points").value)
         self._history_max = int(self.get_parameter("history_frames").value)
         self._corridor_margin = float(self.get_parameter("corridor_margin_px").value)
+        self._publish_guidance = bool(self.get_parameter("publish_aisle_guidance").value)
+        self._publish_dynamic_mask = bool(self.get_parameter("publish_dynamic_mask").value)
+        self._lookahead_frac = float(self.get_parameter("lookahead_row_frac").value)
+        self._guidance_frame = self.get_parameter("guidance_frame").get_parameter_value().string_value
+        self._mask_dilate = int(self.get_parameter("dynamic_mask_dilate_px").value)
 
         self._lane_detector = OpenCvLaneDetector(
             process_width=int(self.get_parameter("process_width").value),
@@ -94,11 +113,15 @@ class CorridorMonitorNode(Node):
 
         self._lane_pub = self.create_publisher(MarkerArray, lane_topic, 10)
         self._in_lane_pub = self.create_publisher(MarkerArray, in_lane_topic, 10)
+        self._guidance_pub = self.create_publisher(PointStamped, guidance_topic, 10)
+        self._dynamic_pub = self.create_publisher(Detection2DArray, dynamic_topic, 10)
+        self._mask_pub = self.create_publisher(Image, mask_topic, 10)
         self.create_subscription(Odometry, odom_topic, self._on_odom, 20)
         self.create_subscription(Image, image_topic, self._on_image, 10)
 
         self.get_logger().info(
-            f"Corridor monitor image={image_topic} lanes->{lane_topic} in_lane->{in_lane_topic}"
+            f"Corridor monitor image={image_topic} lanes->{lane_topic} "
+            f"guidance->{guidance_topic} dynamic->{dynamic_topic}"
         )
 
     def _on_odom(self, msg: Odometry) -> None:
@@ -109,7 +132,11 @@ class CorridorMonitorNode(Node):
             return
 
         try:
-            bgr = self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            if msg.encoding in ("mono8", "8UC1"):
+                gray = self._bridge.imgmsg_to_cv2(msg, desired_encoding="mono8")
+                bgr = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+            else:
+                bgr = self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except Exception as exc:  # noqa: BLE001
             self.get_logger().warn(f"cv_bridge failed: {exc}")
             return
@@ -135,11 +162,35 @@ class CorridorMonitorNode(Node):
         )
         self._lane_pub.publish(lane_markers)
 
+        if self._publish_guidance:
+            guidance = self._compute_aisle_guidance(bgr.shape[1], bgr.shape[0], lanes.left, lanes.right, pose)
+            self._guidance_pub.publish(
+                guidance if guidance is not None else self._empty_guidance()
+            )
+
         in_lane_markers = MarkerArray()
+        detections: list[ObjectDetection] = []
+        stamp = (
+            msg.header.stamp
+            if msg.header.stamp.sec or msg.header.stamp.nanosec
+            else self.get_clock().now().to_msg()
+        )
+        frame_id = msg.header.frame_id or "camera"
         if self._object_detector is not None:
             detections = self._object_detector.detect(bgr)
             in_corridor = self._filter_in_corridor(detections, lanes.left, lanes.right)
             in_lane_markers = self._make_in_lane_markers(in_corridor, pose)
+        self._dynamic_pub.publish(detections_to_ros(detections, stamp, frame_id))
+        if self._publish_dynamic_mask:
+            mask = build_dynamic_mask(
+                bgr.shape[0],
+                bgr.shape[1],
+                detections,
+                dilate_px=self._mask_dilate,
+            )
+            mask_msg = self._bridge.cv2_to_imgmsg(mask, encoding="mono8")
+            mask_msg.header = msg.header
+            self._mask_pub.publish(mask_msg)
         self._in_lane_pub.publish(in_lane_markers)
 
     def _filter_in_corridor(
@@ -159,6 +210,62 @@ class CorridorMonitorNode(Node):
             ):
                 inside.append(det)
         return inside
+
+    def _compute_aisle_guidance(
+        self,
+        width: int,
+        height: int,
+        left,
+        right,
+        pose,
+    ) -> Optional[PointStamped]:
+        y = float(np.clip(self._lookahead_frac, 0.1, 0.98)) * float(height)
+        u_center = 0.5 * float(width)
+        offset_px = corridor_lateral_offset_px(u_center, y, left, right)
+        bounds = corridor_bounds_at_y(y, left, right)
+        if offset_px is None or bounds is None:
+            return None
+
+        x_left, x_right = bounds
+        x_center = 0.5 * (x_left + x_right)
+        width_px = max(1.0, x_right - x_left)
+
+        offset_m = lateral_offset_m_on_ground(
+            (u_center, y),
+            (x_center, y),
+            self._intrinsics,
+            pose,
+            self._ground_z,
+            self._camera_height,
+        )
+        width_m = None
+        left_xyz = pixels_to_map_ground(
+            np.array([[x_left, y], [x_right, y]], dtype=np.float32),
+            self._intrinsics,
+            pose,
+            self._ground_z,
+            self._camera_height,
+        )
+        if len(left_xyz) == 2:
+            width_m = float(np.linalg.norm(left_xyz[1] - left_xyz[0]))
+
+        confidence = min(1.0, width_px / max(float(width), 1.0) * 4.0)
+        if offset_m is None:
+            confidence *= 0.5
+
+        msg = PointStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = self._guidance_frame
+        msg.point.x = float(offset_m if offset_m is not None else offset_px * 0.001)
+        msg.point.y = float(width_m if width_m is not None else width_px * 0.001)
+        msg.point.z = float(confidence)
+        return msg
+
+    def _empty_guidance(self) -> PointStamped:
+        msg = PointStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = self._guidance_frame
+        return msg
 
     def _line_to_map(self, line, pose) -> Optional[np.ndarray]:
         pixels = OpenCvLaneDetector.sample_line(line, self._sample_points)

@@ -22,10 +22,21 @@ ros2 launch realsense2_camera rs_launch.py \
 CogniNav stack:
 
 ```bash
-./scripts/run_live_viz.sh --rig realsense_d455
-# Or inside container:
-ros2 launch cogninav_bringup live.launch.py rig:=realsense_d455
+./scripts/run_live_viz.sh --rig realsense_d455              # Iridescence (default)
+./scripts/run_live_viz.sh --rig realsense_d455 --pangolin   # ORB-SLAM3 Pangolin viewer
+./scripts/run_live_viz.sh --rig realsense_d455 --headless   # no GUI
 ```
+
+## Replay recorded rig bag
+
+After recording, replay through the same stack without hardware:
+
+```bash
+./scripts/run_rig_bag_viz.sh --rig realsense_d455 --bag ~/Downloads/cogninav/realsense_d455_warehouse_aisle1
+./scripts/run_rig_bag_viz.sh --rig realsense_d455 --full --pangolin
+```
+
+Launch file: `rig_replay.launch.py` (auto-discovers latest bag if `--bag` is omitted).
 
 ## ZED2
 
@@ -56,7 +67,9 @@ Bags land in `~/Downloads/cogninav/`.
 After rig or calibration edits:
 
 ```bash
-./benchmarks/run_regression_suite.sh
+./benchmarks/run_regression_suite.sh              # warehouse SLAM + perception (default: r2b)
+./benchmarks/run_regression_suite.sh --source torwic --seq aisle_cw_run_1
+./benchmarks/run_all_gates.sh                       # workspace + regression + optional Humble
 ```
 
 Phase 4 is complete when:

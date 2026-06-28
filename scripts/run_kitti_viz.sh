@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
-# Launch CogniNav on a live stereo rig (Phase 4).
-#
-# Prerequisite: camera driver running (see docker/LIVE_RIG.md).
+# KITTI road dataset — SLAM + lanes + dynamic-mask SLAM (Phase 6).
 #
 # Usage:
-#   ./scripts/run_live_viz.sh --rig realsense_d455
-#   ./scripts/run_live_viz.sh --rig zed2 --pangolin
-#   ./scripts/run_live_viz.sh --rig realsense_d455 --headless
+#   ./scripts/run_kitti_viz.sh --seq 00 --build
+#   ./scripts/run_kitti_viz.sh --seq 00 --headless
 
 set -euo pipefail
 
@@ -15,28 +12,29 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/benchmarks/cogninav_docker.sh"
 
 HEADLESS=false
-VIEWER=""
 for arg in "$@"; do
   case "$arg" in
     --headless) HEADLESS=true ;;
-    --iris|--pangolin) VIEWER="${arg#--}" ;;
-    --rig) ;;
+    --iris|--pangolin) ;;
+    --seq) ;;
   esac
 done
 
 if [[ "$HEADLESS" != true ]]; then
   export COGNINAV_DOCKER_X11=1
 fi
-cogninav_reexec_in_docker "scripts/run_live_viz.sh" "$@"
+cogninav_reexec_in_docker "scripts/run_kitti_viz.sh" "$@"
 
-RIG="realsense_d455"
+SEQ="00"
+RATE="1.0"
 HEADLESS=false
 VIEWER=""
 FORCE_BUILD=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --rig) RIG="$2"; shift 2 ;;
+    --seq) SEQ="$2"; shift 2 ;;
+    --rate) RATE="$2"; shift 2 ;;
     --headless) HEADLESS=true; shift ;;
     --iris) VIEWER="iris"; shift ;;
     --pangolin) VIEWER="pangolin"; shift ;;
@@ -45,15 +43,20 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+SEQ="$(printf '%02d' "$((10#$SEQ))")"
+KITTI_DIR="$(cogninav_downloads_dir)/kitti"
+BAG_PATH="$KITTI_DIR/${SEQ}_ros2"
+
+if [[ ! -d "$BAG_PATH" ]]; then
+  echo "Missing bag $BAG_PATH — see README.md (Datasets)"
+  exit 1
+fi
+
 if [[ "$HEADLESS" == true ]]; then
   VIEWER="none"
 elif [[ -z "$VIEWER" ]]; then
   VIEWER="iris"
 fi
-
-export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/cogninav-runtime}"
-mkdir -p "$XDG_RUNTIME_DIR"
-chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
 
 set +u
 cogninav_ros_setup
@@ -77,10 +80,11 @@ case "$VIEWER" in
   pangolin) USE_PANGOLIN=true ;;
 esac
 
-echo "==> Live rig: $RIG  viewer=$VIEWER"
+echo "==> KITTI replay: seq=$SEQ bag=$BAG_PATH viewer=$VIEWER"
 
-exec ros2 launch cogninav_bringup live.launch.py \
-  rig:="$RIG" \
+exec ros2 launch cogninav_bringup kitti.launch.py \
+  bag_path:="$BAG_PATH" \
+  rate:="$RATE" \
   use_viz:="$USE_VIZ" \
   use_pangolin_viewer:="$USE_PANGOLIN" \
   use_vslam:=true \

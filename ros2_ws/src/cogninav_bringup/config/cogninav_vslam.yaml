@@ -5,7 +5,7 @@
     settings: "/root/cogninav/ros2_ws/src/cogninav_bringup/config/orb_realsense_d455.yaml"
     do_rectify: false
     do_equalize: false
-    use_viewer: false
+    use_orb_viewer: false
     frame_id: "map"
     camera_frame: "cam0"
     left_image_topic: "/cam0/image_raw"

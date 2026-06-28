@@ -49,6 +49,10 @@ CogniNavSlamNode::CogniNavSlamNode()
   this->declare_parameter<std::string>("trajectory_path", "/tmp/cogninav_trajectory.txt");
   this->declare_parameter<double>("map_publish_hz", 5.0);
   this->declare_parameter<int>("max_map_points_publish", 50000);
+  this->declare_parameter<bool>("use_orb_viewer", false);
+  this->declare_parameter<int>("process_every_n", 1);
+  this->declare_parameter<bool>("use_dynamic_mask", false);
+  this->declare_parameter<std::string>("dynamic_mask_topic", "/cogninav/dynamic_mask");
 
   std::string vocabulary;
   std::string settings;
@@ -56,6 +60,7 @@ CogniNavSlamNode::CogniNavSlamNode()
   std::string left_topic;
   std::string right_topic;
   std::string imu_topic;
+  std::string dynamic_mask_topic;
   double map_hz = 2.0;
 
   this->get_parameter("vocabulary", vocabulary);
@@ -77,6 +82,14 @@ CogniNavSlamNode::CogniNavSlamNode()
   this->get_parameter("max_map_points_publish", max_map_pts);
   max_map_points_publish_ = static_cast<size_t>(std::max(0, max_map_pts));
 
+  bool use_orb_viewer = false;
+  this->get_parameter("use_orb_viewer", use_orb_viewer);
+  int process_every_n = 1;
+  this->get_parameter("process_every_n", process_every_n);
+  process_every_n_ = std::max(1, process_every_n);
+  this->get_parameter("use_dynamic_mask", use_dynamic_mask_);
+  this->get_parameter("dynamic_mask_topic", dynamic_mask_topic);
+
   use_imu_ = (slam_mode == "stereo_inertial" || slam_mode == "imu_stereo");
   ORB_SLAM3::System::eSensor sensor = use_imu_ ?
     ORB_SLAM3::System::IMU_STEREO :
@@ -85,8 +98,11 @@ CogniNavSlamNode::CogniNavSlamNode()
   RCLCPP_INFO(this->get_logger(), "Starting ORB-SLAM3 (%s)", slam_mode.c_str());
   RCLCPP_INFO(this->get_logger(), "  vocab: %s", vocabulary.c_str());
   RCLCPP_INFO(this->get_logger(), "  settings: %s", settings.c_str());
+  RCLCPP_INFO(
+    this->get_logger(), "  viewer: %s",
+    use_orb_viewer ? "Pangolin (ORB-SLAM3)" : "headless (use cogninav_viz for Iridescence)");
 
-  slam_ = std::make_unique<ORB_SLAM3::System>(vocabulary, settings, sensor, false);
+  slam_ = std::make_unique<ORB_SLAM3::System>(vocabulary, settings, sensor, use_orb_viewer);
 
   if (do_rectify_) {
     cv::FileStorage fs(settings, cv::FileStorage::READ);
@@ -117,12 +133,20 @@ CogniNavSlamNode::CogniNavSlamNode()
 
   pub_odom_ = this->create_publisher<nav_msgs::msg::Odometry>(odom_topic_, 10);
   pub_map_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(map_topic_, 10);
+  pub_mask_stats_ = this->create_publisher<std_msgs::msg::UInt32>("/cogninav/slam_mask_stats", 10);
   tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
   sub_left_ = this->create_subscription<sensor_msgs::msg::Image>(
     left_topic, rclcpp::SensorDataQoS(), std::bind(&CogniNavSlamNode::grabImageLeft, this, _1));
   sub_right_ = this->create_subscription<sensor_msgs::msg::Image>(
     right_topic, rclcpp::SensorDataQoS(), std::bind(&CogniNavSlamNode::grabImageRight, this, _1));
+
+  if (use_dynamic_mask_) {
+    sub_dynamic_mask_ = this->create_subscription<sensor_msgs::msg::Image>(
+      dynamic_mask_topic, rclcpp::SensorDataQoS(),
+      std::bind(&CogniNavSlamNode::grabDynamicMask, this, _1));
+    RCLCPP_INFO(this->get_logger(), "Dynamic mask enabled: %s", dynamic_mask_topic.c_str());
+  }
 
   if (use_imu_) {
     sub_imu_ = this->create_subscription<sensor_msgs::msg::Imu>(
@@ -133,9 +157,8 @@ CogniNavSlamNode::CogniNavSlamNode()
   }
 
   if (map_hz > 0.0) {
-    map_timer_ = this->create_wall_timer(
-      std::chrono::duration<double>(1.0 / map_hz),
-      std::bind(&CogniNavSlamNode::publishMapPoints, this));
+    const auto period = std::chrono::duration<double>(1.0 / map_hz);
+    map_timer_ = this->create_timer(period, std::bind(&CogniNavSlamNode::publishMapPoints, this));
   }
 
   RCLCPP_INFO(
@@ -159,13 +182,16 @@ CogniNavSlamNode::~CogniNavSlamNode()
 void CogniNavSlamNode::grabImu(const sensor_msgs::msg::Imu::SharedPtr msg)
 {
   std::lock_guard<std::mutex> lock(buf_mutex_);
+  while (imu_buf_.size() >= kMaxImuBuffer) {
+    imu_buf_.pop();
+  }
   imu_buf_.push(msg);
 }
 
 void CogniNavSlamNode::grabImageLeft(const sensor_msgs::msg::Image::SharedPtr msg)
 {
   std::lock_guard<std::mutex> lock(buf_mutex_left_);
-  if (!img_left_buf_.empty()) {
+  while (img_left_buf_.size() >= kMaxImageBuffer) {
     img_left_buf_.pop();
   }
   img_left_buf_.push(msg);
@@ -174,16 +200,80 @@ void CogniNavSlamNode::grabImageLeft(const sensor_msgs::msg::Image::SharedPtr ms
 void CogniNavSlamNode::grabImageRight(const sensor_msgs::msg::Image::SharedPtr msg)
 {
   std::lock_guard<std::mutex> lock(buf_mutex_right_);
-  if (!img_right_buf_.empty()) {
+  while (img_right_buf_.size() >= kMaxImageBuffer) {
     img_right_buf_.pop();
   }
   img_right_buf_.push(msg);
+}
+
+void CogniNavSlamNode::grabDynamicMask(const sensor_msgs::msg::Image::SharedPtr msg)
+{
+  cv_bridge::CvImageConstPtr cv_ptr;
+  try {
+    cv_ptr = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::MONO8);
+  } catch (const cv_bridge::Exception & e) {
+    RCLCPP_WARN_THROTTLE(
+      this->get_logger(), *this->get_clock(), 5000, "dynamic_mask cv_bridge: %s", e.what());
+    return;
+  }
+  std::lock_guard<std::mutex> lock(mask_mutex_);
+  latest_mask_ = cv_ptr->image.clone();
+}
+
+void CogniNavSlamNode::applyDynamicMask(cv::Mat & left, cv::Mat & right)
+{
+  if (!use_dynamic_mask_) {
+    return;
+  }
+
+  cv::Mat mask;
+  {
+    std::lock_guard<std::mutex> lock(mask_mutex_);
+    if (latest_mask_.empty()) {
+      return;
+    }
+    if (latest_mask_.size() != left.size()) {
+      cv::resize(latest_mask_, mask, left.size(), 0, 0, cv::INTER_NEAREST);
+    } else {
+      mask = latest_mask_;
+    }
+  }
+
+  left.setTo(0, mask);
+  if (!right.empty() && right.size() == left.size()) {
+    right.setTo(0, mask);
+  }
+
+  const int masked_px = cv::countNonZero(mask);
+  std_msgs::msg::UInt32 stats;
+  stats.data = static_cast<uint32_t>(masked_px);
+  pub_mask_stats_->publish(stats);
 }
 
 cv::Mat CogniNavSlamNode::getImage(const sensor_msgs::msg::Image::SharedPtr & msg)
 {
   cv_bridge::CvImageConstPtr cv_ptr;
   try {
+    const std::string & encoding = msg->encoding;
+    if (
+      encoding == sensor_msgs::image_encodings::BGR8 ||
+      encoding == sensor_msgs::image_encodings::BGRA8 ||
+      encoding == sensor_msgs::image_encodings::RGB8 ||
+      encoding == sensor_msgs::image_encodings::RGBA8)
+    {
+      cv_ptr = cv_bridge::toCvShare(msg);
+      cv::Mat gray;
+      if (encoding == sensor_msgs::image_encodings::BGR8) {
+        cv::cvtColor(cv_ptr->image, gray, cv::COLOR_BGR2GRAY);
+      } else if (encoding == sensor_msgs::image_encodings::BGRA8) {
+        cv::cvtColor(cv_ptr->image, gray, cv::COLOR_BGRA2GRAY);
+      } else if (encoding == sensor_msgs::image_encodings::RGB8) {
+        cv::cvtColor(cv_ptr->image, gray, cv::COLOR_RGB2GRAY);
+      } else {
+        cv::cvtColor(cv_ptr->image, gray, cv::COLOR_RGBA2GRAY);
+      }
+      return gray;
+    }
     cv_ptr = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::MONO8);
   } catch (const cv_bridge::Exception & e) {
     RCLCPP_ERROR(this->get_logger(), "cv_bridge: %s", e.what());
@@ -219,12 +309,21 @@ void CogniNavSlamNode::publishMapPoints()
     return;
   }
 
-  // Accumulate every observed map point (tracked-only is too sparse for visualization).
-  for (auto * mp : slam_->GetTrackedMapPoints()) {
-    if (!mp || mp->isBad()) {
-      continue;
+  // Accumulate map points; clear cache when tracking is lost so resets do not leave ghosts.
+  const auto tracked = slam_->GetTrackedMapPoints();
+  if (!tracked.empty()) {
+    for (auto * mp : tracked) {
+      if (!mp || mp->isBad()) {
+        continue;
+      }
+      map_points_cache_[mp->mnId] = mp->GetWorldPos();
     }
-    map_points_cache_[mp->mnId] = mp->GetWorldPos();
+    lost_map_frames_ = 0;
+  } else if (!map_points_cache_.empty()) {
+    if (++lost_map_frames_ > 30) {
+      map_points_cache_.clear();
+      lost_map_frames_ = 0;
+    }
   }
 
   if (map_points_cache_.empty()) {
@@ -275,7 +374,7 @@ void CogniNavSlamNode::publishMapPoints()
 
 void CogniNavSlamNode::syncWithImu()
 {
-  const double max_time_diff = 0.01;
+  const double max_time_diff = 0.05;
 
   while (running_ && rclcpp::ok()) {
     cv::Mat im_left;
@@ -339,6 +438,10 @@ void CogniNavSlamNode::syncWithImu()
       continue;
     }
 
+    if (++stereo_frame_counter_ % static_cast<size_t>(process_every_n_) != 0) {
+      continue;
+    }
+
     if (do_equalize_) {
       clahe_->apply(im_left, im_left);
       clahe_->apply(im_right, im_right);
@@ -347,6 +450,7 @@ void CogniNavSlamNode::syncWithImu()
       cv::remap(im_left, im_left, m1l_, m2l_, cv::INTER_LINEAR);
       cv::remap(im_right, im_right, m1r_, m2r_, cv::INTER_LINEAR);
     }
+    applyDynamicMask(im_left, im_right);
 
     const Sophus::SE3f tcw = slam_->TrackStereo(im_left, im_right, t_left, imu_meas);
     publishPose(tcw.inverse(), stamp);
@@ -356,7 +460,7 @@ void CogniNavSlamNode::syncWithImu()
 
 void CogniNavSlamNode::syncStereo()
 {
-  const double max_time_diff = 0.01;
+  const double max_time_diff = 0.05;
 
   while (running_ && rclcpp::ok()) {
     cv::Mat im_left;
@@ -399,6 +503,10 @@ void CogniNavSlamNode::syncStereo()
       continue;
     }
 
+    if (++stereo_frame_counter_ % static_cast<size_t>(process_every_n_) != 0) {
+      continue;
+    }
+
     if (do_equalize_) {
       clahe_->apply(im_left, im_left);
       clahe_->apply(im_right, im_right);
@@ -407,6 +515,7 @@ void CogniNavSlamNode::syncStereo()
       cv::remap(im_left, im_left, m1l_, m2l_, cv::INTER_LINEAR);
       cv::remap(im_right, im_right, m1r_, m2r_, cv::INTER_LINEAR);
     }
+    applyDynamicMask(im_left, im_right);
 
     const Sophus::SE3f tcw = slam_->TrackStereo(im_left, im_right, t_left);
     publishPose(tcw.inverse(), stamp);

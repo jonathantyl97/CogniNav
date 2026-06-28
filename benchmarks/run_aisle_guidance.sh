@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Phase 2 gate: SLAM + depth + lanes on warehouse bag replay.
+# Phase 5 gate: aisle guidance + dynamic perception on warehouse bag replay.
 #
 # Usage:
-#   ./benchmarks/run_warehouse_perception.sh
-#   ./benchmarks/run_warehouse_perception.sh --source r2b
+#   ./benchmarks/run_aisle_guidance.sh
+#   ./benchmarks/run_aisle_guidance.sh --source r2b
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=benchmarks/cogninav_docker.sh
 source "$ROOT/benchmarks/cogninav_docker.sh"
-cogninav_reexec_in_docker "benchmarks/run_warehouse_perception.sh" "$@"
+cogninav_reexec_in_docker "benchmarks/run_aisle_guidance.sh" "$@"
 
-SOURCE="torwic"
+SOURCE="r2b"
 SEQ="aisle_cw_run_1"
 RATE="1.0"
-PROBE_TIMEOUT="${PERCEPTION_PROBE_TIMEOUT:-90}"
-PHASE="${COGNINAV_BENCHMARK_PHASE:-2}"
+PROBE_TIMEOUT="${AISLE_PROBE_TIMEOUT:-90}"
+PHASE="${COGNINAV_BENCHMARK_PHASE:-5}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -33,21 +33,24 @@ case "$SOURCE" in
     PLAY_BAG="$WAREHOUSE_DIR/${SEQ}_ros2"
     LAUNCH="warehouse.launch.py"
     DATASET="warehouse_torwic"
-    # TorWIC replay lacks rectified stereo; dense depth is experimental.
-    PROBE_TOPICS=(/cogninav/odom /cogninav/map_points /cogninav/lane_markers)
     ;;
   r2b)
     PLAY_BAG="$WAREHOUSE_DIR/r2b_storage"
     LAUNCH="r2b_storage.launch.py"
     DATASET="warehouse_r2b"
     SEQ="r2b_storage"
-    PROBE_TOPICS=(/cogninav/odom /cogninav/map_points /cogninav/stereo_points /cogninav/lane_markers)
     ;;
   *)
     echo "Unknown source: $SOURCE (use torwic or r2b)"
     exit 1
     ;;
 esac
+
+PROBE_TOPICS=(
+  /cogninav/aisle_guidance
+  /cogninav/dynamic_detections
+  /cogninav/lane_markers
+)
 
 if [[ ! -d "$PLAY_BAG" ]]; then
   echo "Missing bag $PLAY_BAG — see README.md (Datasets)"
@@ -84,7 +87,6 @@ ros2 launch cogninav_bringup "$LAUNCH" \
   use_lanes:=true &
 LAUNCH_PID=$!
 
-# ORB vocabulary load + first bag loop before probing topics.
 sleep 18
 set +e
 "$ROOT/benchmarks/wait_for_topics.sh" --timeout "$PROBE_TIMEOUT" "${PROBE_TOPICS[@]}"
@@ -98,10 +100,10 @@ LAUNCH_PID=""
 GIT_SHA="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 if [[ "$PROBE_RC" -eq 0 ]]; then
   STATUS="ok"
-  NOTE="Phase 2: perception topics published ($SOURCE): ${PROBE_TOPICS[*]}"
+  NOTE="Phase 5: aisle guidance + dynamic detections ($SOURCE): ${PROBE_TOPICS[*]}"
 else
   STATUS="fail"
-  NOTE="Phase 2: perception topic probe failed ($SOURCE)."
+  NOTE="Phase 5: topic probe failed ($SOURCE)."
 fi
 
 "$ROOT/benchmarks/run_benchmark.sh" \
@@ -112,8 +114,8 @@ fi
   --smoke-note "$NOTE"
 
 if [[ "$PROBE_RC" -ne 0 ]]; then
-  echo "ERROR: warehouse perception gate failed"
+  echo "ERROR: aisle guidance gate failed"
   exit 1
 fi
 
-echo "==> Phase 2 warehouse perception gate passed ($SOURCE / $SEQ)"
+echo "==> Phase 5 aisle guidance gate passed ($SOURCE / $SEQ)"

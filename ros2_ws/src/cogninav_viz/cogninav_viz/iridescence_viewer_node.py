@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections import deque
 from typing import Deque, Optional
 
@@ -14,7 +15,8 @@ from rclpy.clock import Clock, ClockType
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from sensor_msgs.msg import Image, PointCloud2
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, qos_profile_sensor_data
+from sensor_msgs.msg import CompressedImage, Image, PointCloud2
 from sensor_msgs_py import point_cloud2
 from visualization_msgs.msg import MarkerArray
 
@@ -90,6 +92,10 @@ class IridescenceViewerNode(Node):
         self.declare_parameter("show_camera_preview", True)
         self.declare_parameter("camera_image_name", "camera/cam0")
         self.declare_parameter("camera_max_width", 480)
+        self.declare_parameter("camera_preview_hz", 8.0)
+        self.declare_parameter("camera_decimate", 1)
+        self.declare_parameter("camera_use_compressed", False)
+        self.declare_parameter("show_stereo_depth", True)
 
         self._enabled = bool(self.get_parameter("enable_viewer").value)
         self._max_points = int(self.get_parameter("max_points").value)
@@ -102,8 +108,14 @@ class IridescenceViewerNode(Node):
         self._human_scale = float(self.get_parameter("in_lane_human_scale").value)
         self._car_scale = float(self.get_parameter("in_lane_car_scale").value)
         self._show_camera = bool(self.get_parameter("show_camera_preview").value)
+        self._show_stereo = bool(self.get_parameter("show_stereo_depth").value)
         self._camera_image_name = self.get_parameter("camera_image_name").get_parameter_value().string_value
         self._camera_max_width = int(self.get_parameter("camera_max_width").value)
+        self._camera_preview_hz = float(self.get_parameter("camera_preview_hz").value)
+        self._camera_decimate = max(1, int(self.get_parameter("camera_decimate").value))
+        self._camera_use_compressed = bool(self.get_parameter("camera_use_compressed").value)
+        self._camera_frame_counter = 0
+        self._last_camera_upload = 0.0
         camera_topic = self.get_parameter("camera_image_topic").get_parameter_value().string_value
 
         self._bridge = CvBridge()
@@ -128,11 +140,12 @@ class IridescenceViewerNode(Node):
         self._last_camera_frame: Optional[np.ndarray] = None
         self._dirty = False
         self._camera_centered = False
+        self._logged_first_render = False
 
         if self._enabled:
             if not _IRIDESCENCE_AVAILABLE:
                 self.get_logger().error(
-                    "pyridescence not installed. Run scripts/setup_deps.sh in the CogniNav container."
+                    "pyridescence not installed. Run ./docker/setup_deps.sh in the CogniNav container."
                 )
                 self._enabled = False
             else:
@@ -157,15 +170,29 @@ class IridescenceViewerNode(Node):
                 clock=wall_clock,
             )
 
-        self.create_subscription(PointCloud2, map_topic, self._on_map_points, 10)
-        self.create_subscription(PointCloud2, stereo_topic, self._on_stereo_points, 10)
-        self.create_subscription(Odometry, odom_topic, self._on_odom, 50)
-        self.create_subscription(MarkerArray, lane_topic, self._on_lane_markers, 10)
-        self.create_subscription(MarkerArray, in_lane_topic, self._on_in_lane_markers, 10)
+        sensor_qos = qos_profile_sensor_data
+        reliable_qos = QoSProfile(
+            depth=10,
+            reliability=ReliabilityPolicy.RELIABLE,
+            history=HistoryPolicy.KEEP_LAST,
+        )
+
+        self.create_subscription(PointCloud2, map_topic, self._on_map_points, reliable_qos)
+        self.create_subscription(PointCloud2, stereo_topic, self._on_stereo_points, reliable_qos)
+        self.create_subscription(Odometry, odom_topic, self._on_odom, reliable_qos)
+        self.create_subscription(MarkerArray, lane_topic, self._on_lane_markers, reliable_qos)
+        self.create_subscription(MarkerArray, in_lane_topic, self._on_in_lane_markers, reliable_qos)
         if self._show_camera:
-            self.create_subscription(Image, camera_topic, self._on_camera_image, 10)
+            if self._camera_use_compressed:
+                self.create_subscription(
+                    CompressedImage, camera_topic, self._on_camera_compressed, sensor_qos
+                )
+            else:
+                self.create_subscription(Image, camera_topic, self._on_camera_image, sensor_qos)
             self.get_logger().info(
-                f"Camera preview in Iridescence panel: {camera_topic} -> {self._camera_image_name}"
+                f"Camera preview ({'compressed' if self._camera_use_compressed else 'raw'}): "
+                f"{camera_topic} -> {self._camera_image_name} "
+                f"(max {self._camera_preview_hz:.1f} Hz, decimate {self._camera_decimate})"
             )
 
         self.get_logger().info(
@@ -192,11 +219,39 @@ class IridescenceViewerNode(Node):
         return np.ascontiguousarray(image, dtype=np.uint8)
 
     def _on_camera_image(self, msg: Image) -> None:
+        self._camera_frame_counter += 1
+        if self._camera_frame_counter % self._camera_decimate != 0:
+            return
         image = self._prepare_camera_frame(msg)
         if image is None:
             return
         with self._lock:
             self._last_camera_frame = image
+            self._dirty = True
+
+    def _on_camera_compressed(self, msg: CompressedImage) -> None:
+        self._camera_frame_counter += 1
+        if self._camera_frame_counter % self._camera_decimate != 0:
+            return
+        try:
+            buf = np.frombuffer(msg.data, dtype=np.uint8)
+            image = cv2.imdecode(buf, cv2.IMREAD_COLOR)
+        except Exception as exc:  # noqa: BLE001
+            self.get_logger().warn(f"Compressed camera decode failed: {exc}")
+            return
+        if image is None:
+            return
+        if self._camera_max_width > 0 and image.shape[1] > self._camera_max_width:
+            scale = self._camera_max_width / float(image.shape[1])
+            image = cv2.resize(
+                image,
+                None,
+                fx=scale,
+                fy=scale,
+                interpolation=cv2.INTER_AREA,
+            )
+        with self._lock:
+            self._last_camera_frame = np.ascontiguousarray(image, dtype=np.uint8)
             self._dirty = True
 
     def _on_stereo_points(self, msg: PointCloud2) -> None:
@@ -221,9 +276,6 @@ class IridescenceViewerNode(Node):
             self._trajectory.append(xyz)
             self._camera_xyz = tuple(xyz.tolist())
             self._dirty = True
-            if self._viewer is not None and not self._camera_centered:
-                self._viewer.lookat(xyz.reshape(3, 1).astype(np.float32))
-                self._camera_centered = True
 
     def _on_lane_markers(self, msg: MarkerArray) -> None:
         left: Optional[np.ndarray] = None
@@ -260,13 +312,19 @@ class IridescenceViewerNode(Node):
             self._in_lane_cars = cars
             self._dirty = True
 
+    def _as_points(self, xyz: Optional[np.ndarray]) -> Optional[np.ndarray]:
+        if xyz is None or len(xyz) == 0:
+            return None
+        pts = np.ascontiguousarray(xyz, dtype=np.float32)
+        if pts.ndim != 2 or pts.shape[1] != 3:
+            return None
+        return pts
+
     def _flush_to_viewer(self) -> None:
         if not self._enabled or self._viewer is None:
             return
 
         with self._lock:
-            if not self._dirty:
-                return
             map_xyz = self._pending_map
             stereo_xyz = self._pending_stereo
             traj = np.asarray(self._trajectory, dtype=np.float32) if self._trajectory else None
@@ -276,7 +334,13 @@ class IridescenceViewerNode(Node):
             in_lane_humans = list(self._in_lane_humans)
             in_lane_cars = list(self._in_lane_cars)
             camera_frame = self._last_camera_frame
-            self._dirty = False
+            center_camera = not self._camera_centered
+            if self._dirty:
+                self._dirty = False
+
+        map_xyz = self._as_points(map_xyz)
+        stereo_xyz = self._as_points(stereo_xyz)
+        traj = self._as_points(traj)
 
         if map_xyz is not None and len(map_xyz) > 0:
             self._viewer.update_points(
@@ -285,7 +349,7 @@ class IridescenceViewerNode(Node):
                 guik.Rainbow().add("point_scale", self._point_scale),
             )
 
-        if stereo_xyz is not None and len(stereo_xyz) > 0:
+        if stereo_xyz is not None and len(stereo_xyz) > 0 and self._show_stereo and traj is not None and len(traj) >= 2:
             self._viewer.update_points(
                 "stereo_depth",
                 stereo_xyz,
@@ -298,6 +362,23 @@ class IridescenceViewerNode(Node):
                 traj,
                 guik.FlatGreen().add("point_scale", self._traj_scale),
             )
+            if center_camera:
+                focus = traj[-1].reshape(3, 1).astype(np.float32)
+                self._viewer.lookat(focus)
+                self._camera_centered = True
+
+        if not self._logged_first_render and (
+            map_xyz is not None or stereo_xyz is not None or traj is not None
+        ):
+            self.get_logger().info(
+                "Viz render: map=%s stereo=%s traj=%s"
+                % (
+                    len(map_xyz) if map_xyz is not None else 0,
+                    len(stereo_xyz) if stereo_xyz is not None else 0,
+                    len(traj) if traj is not None else 0,
+                )
+            )
+            self._logged_first_render = True
 
         if camera is not None:
             self._viewer.update_coord(
@@ -320,8 +401,15 @@ class IridescenceViewerNode(Node):
             )
 
         if self._show_camera and camera_frame is not None:
-            width, height, rgba_bytes = _bgr_to_rgba_list(camera_frame)
-            self._viewer.update_image(self._camera_image_name, width, height, rgba_bytes)
+            now = time.monotonic()
+            min_dt = 1.0 / max(self._camera_preview_hz, 0.5)
+            if now - self._last_camera_upload >= min_dt:
+                try:
+                    width, height, rgba = _bgr_to_rgba_list(camera_frame)
+                    self._viewer.update_image(self._camera_image_name, width, height, rgba)
+                    self._last_camera_upload = now
+                except Exception as exc:  # noqa: BLE001
+                    self.get_logger().warn(f"Camera preview upload failed: {exc}")
 
     def _draw_lane_strip(
         self,
@@ -351,10 +439,14 @@ class IridescenceViewerNode(Node):
 
 
 def main(args: Optional[list[str]] = None) -> None:
+    from rclpy.executors import MultiThreadedExecutor
+
     rclpy.init(args=args)
     node = IridescenceViewerNode()
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:

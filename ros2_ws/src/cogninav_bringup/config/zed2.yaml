@@ -9,7 +9,7 @@
     settings: "/root/cogninav/ros2_ws/src/cogninav_bringup/config/orb_zed2.yaml"
     do_rectify: false
     do_equalize: false
-    use_viewer: false
+    use_orb_viewer: false
     frame_id: "map"
     camera_frame: "zed_left_camera_optical_frame"
     left_image_topic: "/zed/zed_node/left/image_rect_color"

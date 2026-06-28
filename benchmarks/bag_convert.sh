@@ -24,7 +24,7 @@ convert_ros1_bag_if_needed() {
   if [[ "$distro" == "humble" ]]; then
     local root
     root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-    python3 "$root/scripts/sanitize_ros2_bag_for_humble.py" "$ros2_bag"
+    python3 "$root/benchmarks/sanitize_ros2_bag_for_humble.py" "$ros2_bag"
   fi
   echo "$ros2_bag"
 }

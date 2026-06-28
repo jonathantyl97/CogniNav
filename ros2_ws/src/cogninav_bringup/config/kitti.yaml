@@ -1,0 +1,73 @@
+# KITTI odometry — full CogniNav stack on road stereo bag replay.
+# Bag: see README.md (Datasets) — KITTI 00_ros2 under ~/Downloads/kitti/
+
+/cogninav_vslam:
+  ros__parameters:
+    slam_mode: "stereo"
+    vocabulary: "/root/cogninav/third_party/ORB_SLAM3/Vocabulary/ORBvoc.txt"
+    settings: "/root/cogninav/ros2_ws/src/cogninav_bringup/config/orb_kitti.yaml"
+    do_rectify: false
+    do_equalize: false
+    frame_id: "map"
+    camera_frame: "kitti_cam0"
+    left_image_topic: "/kitti/cam0/image_raw"
+    right_image_topic: "/kitti/cam1/image_raw"
+    odom_topic: "/cogninav/odom"
+    map_points_topic: "/cogninav/map_points"
+    trajectory_path: "/tmp/cogninav_kitti_trajectory.txt"
+    publish_tf: true
+    map_publish_hz: 5.0
+    max_map_points_publish: 50000
+    use_dynamic_mask: true
+    dynamic_mask_topic: "/cogninav/dynamic_mask"
+
+/cogninav_depth:
+  ros__parameters:
+    left_image_topic: "/kitti/cam0/image_raw"
+    right_image_topic: "/kitti/cam1/image_raw"
+    odom_topic: "/cogninav/odom"
+    depth_points_topic: "/cogninav/stereo_points"
+    map_frame: "map"
+    fx: 718.856
+    fy: 718.856
+    cx: 607.1928
+    cy: 185.2157
+    baseline_m: 0.5371657
+    max_points: 25000
+    sync_slop_sec: 0.05
+
+/cogninav_corridor_monitor:
+  ros__parameters:
+    image_topic: "/kitti/cam0/image_raw"
+    odom_topic: "/cogninav/odom"
+    lane_markers_topic: "/cogninav/lane_markers"
+    in_lane_markers_topic: "/cogninav/in_lane_markers"
+    map_frame: "map"
+    fx: 718.856
+    fy: 718.856
+    cx: 607.1928
+    cy: 185.2157
+    camera_height: 1.65
+    ground_z: 0.0
+    process_width: 640
+    sample_points: 20
+    history_frames: 30
+    corridor_margin_px: 10.0
+    detection_confidence: 0.40
+    enable_object_detection: true
+    publish_dynamic_mask: true
+    mobilenet_prototxt: "/root/cogninav/models/MobileNetSSD_deploy.prototxt"
+    mobilenet_weights: "/root/cogninav/models/MobileNetSSD_deploy.caffemodel"
+
+/cogninav_viz:
+  ros__parameters:
+    max_points: 15000
+    update_rate_hz: 12.0
+    point_scale: 2.0
+    stereo_point_scale: 1.2
+    show_stereo_depth: true
+    trajectory_max_waypoints: 1200
+    camera_max_width: 400
+    show_camera_preview: true
+    camera_image_topic: "/kitti/cam0/image_raw"
+    camera_image_name: "camera/kitti_cam0"

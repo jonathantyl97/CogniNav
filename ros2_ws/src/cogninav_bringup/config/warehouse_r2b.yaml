@@ -1,5 +1,5 @@
 # NVIDIA r2b_storage — full CogniNav stack on native ROS 2 bag replay.
-# Bag: ./scripts/download_warehouse.sh --source r2b
+# Bag: see README.md (Datasets) — r2b_storage under ~/Downloads/warehouse/
 
 /cogninav_vslam:
   ros__parameters:
@@ -18,6 +18,8 @@
     publish_tf: true
     map_publish_hz: 5.0
     max_map_points_publish: 50000
+    use_dynamic_mask: true
+    dynamic_mask_topic: "/cogninav/dynamic_mask"
 
 /cogninav_depth:
   ros__parameters:
@@ -52,6 +54,7 @@
     history_frames: 40
     corridor_margin_px: 12.0
     detection_confidence: 0.45
-    enable_object_detection: false
+    enable_object_detection: true
+    publish_dynamic_mask: true
     mobilenet_prototxt: "/root/cogninav/models/MobileNetSSD_deploy.prototxt"
     mobilenet_weights: "/root/cogninav/models/MobileNetSSD_deploy.caffemodel"

@@ -58,7 +58,7 @@ class MobileNetSsdDetector:
                 f"MobileNet-SSD model not found.\n"
                 f"  prototxt: {proto}\n"
                 f"  caffemodel: {weights}\n"
-                f"Run: ./scripts/download_models.sh"
+                f"See README.md (Datasets) for MobileNet-SSD weights."
             )
         self._net = cv2.dnn.readNetFromCaffe(str(proto), str(weights))
         self._conf = confidence_threshold

@@ -1,9 +1,10 @@
 # TorWIC warehouse (Clearpath) — full CogniNav stack on bag replay.
-# Bag: ./scripts/download_warehouse.sh --source torwic --seq aisle_cw_run_1
+# Bag: see README.md (Datasets) — optional TorWIC
 
 /cogninav_vslam:
   ros__parameters:
-    slam_mode: "stereo_inertial"
+    # Stereo + real calibrations (stereo_inertial resets often on TorWIC bag IMU sync).
+    slam_mode: "stereo"
     vocabulary: "/root/cogninav/third_party/ORB_SLAM3/Vocabulary/ORBvoc.txt"
     settings: "/root/cogninav/ros2_ws/src/cogninav_bringup/config/orb_torwic_azure.yaml"
     do_rectify: false
@@ -26,11 +27,11 @@
     odom_topic: "/cogninav/odom"
     depth_points_topic: "/cogninav/stereo_points"
     map_frame: "map"
-    fx: 610.0
-    fy: 610.0
-    cx: 640.0
-    cy: 360.0
-    baseline_m: 0.075
+    fx: 621.397474651
+    fy: 620.649424677
+    cx: 649.644481364
+    cy: 367.908146432
+    baseline_m: 0.154290331949
     max_points: 30000
     sync_slop_sec: 0.08
 
@@ -41,10 +42,10 @@
     lane_markers_topic: "/cogninav/lane_markers"
     in_lane_markers_topic: "/cogninav/in_lane_markers"
     map_frame: "map"
-    fx: 610.0
-    fy: 610.0
-    cx: 640.0
-    cy: 360.0
+    fx: 621.397474651
+    fy: 620.649424677
+    cx: 649.644481364
+    cy: 367.908146432
     camera_height: 1.2
     ground_z: 0.0
     process_width: 640

@@ -1,3 +1,5 @@
+"""KITTI odometry bag replay — road stereo + lanes + dynamic-mask SLAM."""
+
 from launch import LaunchDescription
 from launch.actions import (
     AppendEnvironmentVariable,
@@ -14,9 +16,8 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description() -> LaunchDescription:
     pkg = FindPackageShare("cogninav_bringup")
-    r2b_params = PathJoinSubstitution([pkg, "config", "warehouse_r2b.yaml"])
+    kitti_params = PathJoinSubstitution([pkg, "config", "kitti.yaml"])
     viz_base = PathJoinSubstitution([pkg, "config", "cogninav_viz.yaml"])
-    viz_r2b = PathJoinSubstitution([pkg, "config", "warehouse_viz_r2b.yaml"])
 
     bag_path = LaunchConfiguration("bag_path")
     rate = LaunchConfiguration("rate")
@@ -45,30 +46,18 @@ def generate_launch_description() -> LaunchDescription:
         [
             DeclareLaunchArgument(
                 "bag_path",
-                default_value="/root/Downloads/warehouse/r2b_storage",
+                default_value="/root/Downloads/kitti/00_ros2",
             ),
             DeclareLaunchArgument("rate", default_value="1.0"),
-            DeclareLaunchArgument(
-                "bag_play_delay",
-                default_value="10.0",
-                description="Seconds to wait before bag play (ORB vocab load)",
-            ),
+            DeclareLaunchArgument("bag_play_delay", default_value="10.0"),
             DeclareLaunchArgument("use_viz", default_value="true"),
-            DeclareLaunchArgument(
-                "use_pangolin_viewer",
-                default_value="false",
-                description="ORB-SLAM3 built-in Pangolin viewer (mutually exclusive with use_viz)",
-            ),
+            DeclareLaunchArgument("use_pangolin_viewer", default_value="false"),
             DeclareLaunchArgument("use_vslam", default_value="true"),
             DeclareLaunchArgument("use_depth", default_value="true"),
             DeclareLaunchArgument("use_lanes", default_value="true"),
             DeclareLaunchArgument("use_sim_time", default_value="true"),
             DeclareLaunchArgument("show_stereo_depth", default_value="true"),
-            DeclareLaunchArgument(
-                "bag_loop",
-                default_value="false",
-                description="Loop bag playback (use for short benchmark bags)",
-            ),
+            DeclareLaunchArgument("bag_loop", default_value="true"),
             SetEnvironmentVariable(name="RCUTILS_COLORIZED_OUTPUT", value="1"),
             SetEnvironmentVariable(name="RMW_FASTRTPS_USE_SHM", value="0"),
             SetEnvironmentVariable(name="OMP_NUM_THREADS", value="4"),
@@ -81,8 +70,7 @@ def generate_launch_description() -> LaunchDescription:
                 executable="orb_slam3_node",
                 name="cogninav_vslam",
                 parameters=[
-                    r2b_params,
-                    viz_r2b,
+                    kitti_params,
                     {"use_sim_time": use_sim_time, "use_orb_viewer": use_pangolin_viewer},
                 ],
                 output="screen",
@@ -92,7 +80,7 @@ def generate_launch_description() -> LaunchDescription:
                 package="cogninav_depth",
                 executable="stereo_depth",
                 name="cogninav_depth",
-                parameters=[r2b_params, viz_r2b, {"use_sim_time": use_sim_time}],
+                parameters=[kitti_params, {"use_sim_time": use_sim_time}],
                 output="screen",
                 condition=IfCondition(use_depth),
             ),
@@ -100,26 +88,19 @@ def generate_launch_description() -> LaunchDescription:
                 package="cogninav_lanes",
                 executable="corridor_monitor",
                 name="cogninav_corridor_monitor",
-                parameters=[r2b_params, viz_r2b, {"use_sim_time": use_sim_time}],
+                parameters=[kitti_params, {"use_sim_time": use_sim_time}],
                 output="screen",
                 condition=IfCondition(use_lanes),
             ),
-            TimerAction(
-                period=bag_play_delay,
-                actions=[bag_play, bag_play_loop],
-            ),
+            TimerAction(period=bag_play_delay, actions=[bag_play, bag_play_loop]),
             Node(
                 package="cogninav_viz",
                 executable="iridescence_viewer",
                 name="cogninav_viz",
                 parameters=[
                     viz_base,
-                    r2b_params,
-                    viz_r2b,
-                    {
-                        "use_sim_time": use_sim_time,
-                        "show_stereo_depth": show_stereo_depth,
-                    },
+                    kitti_params,
+                    {"use_sim_time": use_sim_time, "show_stereo_depth": show_stereo_depth},
                 ],
                 output="screen",
                 condition=IfCondition(use_viz),

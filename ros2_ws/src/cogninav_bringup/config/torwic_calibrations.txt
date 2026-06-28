@@ -1,0 +1,84 @@
+# Sensor Calibration
+
+# Left Camera calibration and distortion parameters
+Camera1.parent_frame_id = "os_sensor"
+Camera1.frame_id = "azure_left_camera"
+Camera1.type: "PinHole"
+
+Camera1.fx: 621.397474650905
+Camera1.cx: 649.644481364277
+Camera1.fy: 620.649424677401
+Camera1.cy: 367.908146431575
+
+# Left Camera resolution
+Camera1.width: 1280
+Camera1.height: 720
+
+# Left Camera distortion parameters (opencv, [k1, k2, p1, p2, k3])
+Camera1.D = [0.0754678811883405, -0.0314893098110791, 0.00101924098521082, 0.00209529701722382, -0.000935223936623030]
+
+# Right Camera calibration and distortion parameters
+Camera2.parent_frame_id = "os_sensor"
+Camera2.frame_id = "azure_right_camera"
+Camera2.type: "PinHole"
+
+Camera2.fx: 613.100554293744
+Camera2.cx: 638.086832160361
+Camera2.fy: 613.903691840614
+Camera2.cy: 378.314715743037
+
+# Right Camera resolution
+Camera2.width: 1280
+Camera2.height: 720
+
+# Right Camera distortion parameters (opencv, [k1, k2, p1, p2, k3])
+Camera2.D = [0.0873365707229730, -0.0669194159864173, 0.00495094616995581, 0.000778746904798700, 0.0221870772417529]
+
+
+# Left Camera extrinsics w.r.t. the OS128 Lidar (origin of the sensor rack)
+
+T_cam1_os.px: 0.12944592 
+T_cam1_os.py: 0.04299934 
+T_cam1_os.pz: -0.1137434 
+
+T_cam1_os.qx: -0.6116725 
+T_cam1_os.qy: 0.39292797 
+T_cam1_os.qz: -0.3567415 
+T_cam1_os.qw: 0.58668551
+
+# Right Camera extrinsics w.r.t. the OS128 Lidar (origin of the sensor rack)
+
+T_cam2_os.px: 0.07686256 
+T_cam2_os.py: -0.15441064 
+T_cam2_os.pz: -0.1026438 
+
+T_cam2_os.qx: 0.41406507 
+T_cam2_os.qy: -0.6100328 
+T_cam2_os.qz: 0.57049433 
+T_cam2_os.qw: -0.3618651
+
+# Left Camera IMU extrinsics w.r.t. Left Camera
+Imu1.parent_frame_id = "azure_left_camera"
+Imu1.frame_id = "azure_left_imu"
+
+T_imu1_cam1.px: -0.0286307
+T_imu1_cam1.py: -0.0031187
+T_imu1_cam1.pz: -0.0472054 
+
+T_imu1_cam1.qx: -0.4987278
+T_imu1_cam1.qy: 0.50105310
+T_imu1_cam1.qz: 0.50066704 
+T_imu1_cam1.qw: 0.49954869
+
+# Right Camera IMU extrinsics w.r.t. Right Camera
+Imu2.parent_frame_id = "azure_right_camera"
+Imu2.frame_id = "azure_right_imu"
+
+T_imu2_cam2.px: -0.0285823
+T_imu2_cam2.py: -0.0032089
+T_imu2_cam2.pz: -0.0470858
+
+T_imu2_cam2.qx: -0.4981531
+T_imu2_cam2.qy: 0.49746627
+T_imu2_cam2.qz: 0.50380434
+T_imu2_cam2.qw: 0.50055160

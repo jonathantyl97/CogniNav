@@ -31,7 +31,7 @@ find_package(ORB_SLAM3 QUIET)
 if(NOT ORB_SLAM3_FOUND)
   message(WARNING
     "ORB-SLAM3 not found at $ENV{ORB_SLAM3_ROOT_DIR}. "
-    "Run ./scripts/setup_deps.sh in the CogniNav Docker container, then rebuild.")
+    "Run ./docker/setup_deps.sh in the CogniNav Docker container, then rebuild.")
   ament_package()
   return()
 endif()
@@ -66,7 +66,7 @@ add_executable(orb_slam3_node
   src/cogninav_slam_node.cpp
 )
 ament_target_dependencies(orb_slam3_node
-  rclcpp sensor_msgs nav_msgs geometry_msgs tf2_ros cv_bridge ORB_SLAM3 Pangolin)
+  rclcpp sensor_msgs nav_msgs geometry_msgs tf2_ros std_msgs cv_bridge ORB_SLAM3 Pangolin)
 target_link_libraries(orb_slam3_node ${OpenCV_LIBS})
 
 install(TARGETS orb_slam3_stereo orb_slam3_stereo_inertial orb_slam3_node

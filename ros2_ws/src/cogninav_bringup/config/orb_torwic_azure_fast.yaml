@@ -1,7 +1,7 @@
 %YAML:1.0
 
-# TorWIC Azure Kinect RGB @ 1280x720 — generated from torwic_calibrations.txt
-# Regenerate: python3 benchmarks/tools/apply_torwic_calibrations.py
+# TorWIC interactive viz — same calibration as orb_torwic_azure.yaml, lighter ORB load.
+# Benchmarks use orb_torwic_azure.yaml (full quality).
 
 File.version: "1.0"
 
@@ -14,7 +14,7 @@ Camera1.cy: 367.908146432
 Camera1.k1: 0.0754678811883
 Camera1.k2: -0.0314893098111
 Camera1.p1: 0.00101924098521
-Camera1.p2: 0.00209529701722
+Camera1.p2: 0.00209529701722382
 Camera1.k3: -0.000935223936623
 
 Camera2.fx: 613.100554294
@@ -57,11 +57,11 @@ IMU.GyroWalk: 1.0e-05
 IMU.AccWalk: 1.0e-03
 IMU.Frequency: 200.0
 
-ORBextractor.nFeatures: 1200
+ORBextractor.nFeatures: 800
 ORBextractor.scaleFactor: 1.2
-ORBextractor.nLevels: 8
-ORBextractor.iniThFAST: 20
-ORBextractor.minThFAST: 7
+ORBextractor.nLevels: 6
+ORBextractor.iniThFAST: 25
+ORBextractor.minThFAST: 9
 
 Viewer.KeyFrameSize: 0.05
 Viewer.KeyFrameLineWidth: 1.0

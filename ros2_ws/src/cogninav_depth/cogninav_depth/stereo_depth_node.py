@@ -64,12 +64,17 @@ class StereoDepthNode(Node):
         self._max_image_width = int(self.get_parameter("max_image_width").value)
         self._process_every_n = max(1, int(self.get_parameter("process_every_n").value))
         self._frame_count = 0
+        self._fx = float(self.get_parameter("fx").value)
+        self._fy = float(self.get_parameter("fy").value)
+        self._cx = float(self.get_parameter("cx").value)
+        self._cy = float(self.get_parameter("cy").value)
+        self._baseline_m = float(self.get_parameter("baseline_m").value)
         self._estimator = StereoDepthEstimator(
-            fx=float(self.get_parameter("fx").value),
-            fy=float(self.get_parameter("fy").value),
-            cx=float(self.get_parameter("cx").value),
-            cy=float(self.get_parameter("cy").value),
-            baseline_m=float(self.get_parameter("baseline_m").value),
+            fx=self._fx,
+            fy=self._fy,
+            cx=self._cx,
+            cy=self._cy,
+            baseline_m=self._baseline_m,
             max_points=int(self.get_parameter("max_points").value),
         )
         self._bridge = CvBridge()
@@ -94,25 +99,39 @@ class StereoDepthNode(Node):
         self._latest_odom = msg
 
     def _on_stereo_pair(self, left_msg: Image, right_msg: Image) -> None:
-        if self._latest_odom is None:
-            return
         self._frame_count += 1
         if self._frame_count % self._process_every_n != 0:
             return
         try:
-            left = self._bridge.imgmsg_to_cv2(left_msg, desired_encoding="bgr8")
-            right = self._bridge.imgmsg_to_cv2(right_msg, desired_encoding="bgr8")
+            left = self._bridge.imgmsg_to_cv2(left_msg, desired_encoding="passthrough")
+            right = self._bridge.imgmsg_to_cv2(right_msg, desired_encoding="passthrough")
+            if left.ndim == 2:
+                left = cv2.cvtColor(left, cv2.COLOR_GRAY2BGR)
+            elif left.shape[2] == 4:
+                left = cv2.cvtColor(left, cv2.COLOR_BGRA2BGR)
+            if right.ndim == 2:
+                right = cv2.cvtColor(right, cv2.COLOR_GRAY2BGR)
+            elif right.shape[2] == 4:
+                right = cv2.cvtColor(right, cv2.COLOR_BGRA2BGR)
         except Exception as exc:  # noqa: BLE001
             self.get_logger().warn(f"cv_bridge failed: {exc}")
             return
 
+        fx, fy, cx, cy = self._fx, self._fy, self._cx, self._cy
         if self._max_image_width > 0 and left.shape[1] > self._max_image_width:
             scale = self._max_image_width / float(left.shape[1])
             new_size = (self._max_image_width, int(left.shape[0] * scale))
             left = cv2.resize(left, new_size, interpolation=cv2.INTER_AREA)
             right = cv2.resize(right, new_size, interpolation=cv2.INTER_AREA)
+            fx *= scale
+            fy *= scale
+            cx *= scale
+            cy *= scale
 
-        pts_c = self._estimator.compute_points(left, right)
+        if self._latest_odom is None:
+            return
+
+        pts_c = self._estimator.compute_points(left, right, fx=fx, fy=fy, cx=cx, cy=cy)
         if pts_c is None:
             return
 

@@ -3,7 +3,7 @@
 # Visualization: Iridescence (cogninav_viz + pyridescence), NOT Pangolin GUI.
 #
 # Usage (inside container):
-#   cd /root/cogninav && ./scripts/setup_deps.sh
+#   cd /root/cogninav && ./docker/setup_deps.sh
 
 set -euo pipefail
 
@@ -26,13 +26,13 @@ apt-get install -y --no-install-recommends \
 mkdir -p "$THIRD_PARTY"
 
 if [[ -f /opt/ros/humble/setup.bash ]]; then
-  ORB_PATCH="$ROOT/scripts/patch_orb_humble.sh"
+  ORB_PATCH="$ROOT/docker/patch_orb_humble.sh"
   ROS_DISTRO_DETECTED="humble"
 elif [[ -f /opt/ros/jazzy/setup.bash ]]; then
-  ORB_PATCH="$ROOT/scripts/patch_orb_jazzy.sh"
+  ORB_PATCH="$ROOT/docker/patch_orb_jazzy.sh"
   ROS_DISTRO_DETECTED="jazzy"
 else
-  ORB_PATCH="$ROOT/scripts/patch_orb_jazzy.sh"
+  ORB_PATCH="$ROOT/docker/patch_orb_jazzy.sh"
   ROS_DISTRO_DETECTED="unknown"
 fi
 echo "    ROS distro: $ROS_DISTRO_DETECTED"
@@ -50,10 +50,8 @@ fi
 
 "$ORB_PATCH" "$ORB_DIR"
 
-# Clean partial builds after patch changes.
 rm -rf "$ORB_DIR/build" "$ORB_DIR/Thirdparty/"{DBoW2,g2o,Sophus}/build
 
-# Pangolin: required to link stock ORB-SLAM3; we disable the viewer in the ROS node.
 if [[ ! -f /usr/local/lib/libpangolin.so ]] && [[ ! -f /usr/lib/libpangolin.so ]]; then
   echo "==> Building Pangolin (compile-only; Iridescence is the viewer)..."
   PANGOLIN_DIR="/tmp/Pangolin"
@@ -96,13 +94,11 @@ if pip3 install --help 2>/dev/null | grep -q break-system-packages; then
 fi
 pip3 install "${PIP_EXTRA[@]}" \
   pyridescence \
+  rosbags \
   evo numpy scipy
-
-"$ROOT/scripts/download_models.sh"
 
 echo ""
 echo "Done."
 echo "  ORB-SLAM3 lib: $ORB_DIR/lib/libORB_SLAM3.so"
-echo "  Next: vendor ORB-SLAM3 ROS2 wrapper into ros2_ws/src/cogninav_vslam"
-echo "        Set System(..., bUseViewer=false) — see cogninav_vslam/README"
-echo "  Viz: ros2 launch cogninav_bringup cogninav.launch.py  (needs DISPLAY / X11)"
+echo "  Optional MobileNet weights: see README.md (Datasets)"
+echo "  Viz: ./scripts/run_warehouse_viz.sh  (needs DISPLAY / X11)"

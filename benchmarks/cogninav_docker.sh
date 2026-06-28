@@ -147,7 +147,7 @@ cogninav_resolve_ros2_bag() {
   elif [[ -d "$bag_legacy" ]]; then
     if [[ "$distro" == "humble" ]]; then
       echo "==> Preparing Humble-compatible ROS 2 bag: $bag_distro" >&2
-      python3 "$root/scripts/sanitize_ros2_bag_for_humble.py" \
+      python3 "$root/benchmarks/sanitize_ros2_bag_for_humble.py" \
         "$bag_legacy" --out "$bag_distro" >&2
       play_bag="$bag_distro"
     else

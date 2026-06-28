@@ -2,19 +2,18 @@
 # Smoke test: ORB-SLAM3 + workspace on warehouse ROS 2 bags.
 #
 # Usage:
-#   ./scripts/smoke_warehouse.sh --workspace-only
-#   ./scripts/smoke_warehouse.sh --source torwic --seq aisle_cw_run_1
-#   ./scripts/smoke_warehouse.sh --source r2b
+#   ./benchmarks/smoke_warehouse.sh --workspace-only
+#   ./benchmarks/smoke_warehouse.sh --source r2b
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=benchmarks/cogninav_docker.sh
 source "$ROOT/benchmarks/cogninav_docker.sh"
-cogninav_reexec_in_docker "scripts/smoke_warehouse.sh" "$@"
+cogninav_reexec_in_docker "benchmarks/smoke_warehouse.sh" "$@"
 
-SOURCE="${WAREHOUSE_SOURCE:-torwic}"
-SEQ="${WAREHOUSE_SEQ:-aisle_cw_run_1}"
+SOURCE="${WAREHOUSE_SOURCE:-r2b}"
+SEQ="${WAREHOUSE_SEQ:-r2b_storage}"
 ORB_LIB="$ROOT/third_party/ORB_SLAM3/lib/libORB_SLAM3.so"
 WORKSPACE_ONLY=false
 
@@ -34,7 +33,7 @@ fi
 echo "==> Warehouse smoke: $SOURCE / $SEQ"
 
 if [[ ! -f "$ORB_LIB" ]]; then
-  echo "Missing $ORB_LIB — run ./scripts/setup_deps.sh first"
+  echo "Missing $ORB_LIB — run ./docker/setup_deps.sh first"
   exit 1
 fi
 
@@ -71,7 +70,17 @@ if [[ "$WORKSPACE_ONLY" == true ]]; then
   exit 0
 fi
 
-"$ROOT/scripts/download_warehouse.sh" --source "$SOURCE" --seq "$SEQ"
+WAREHOUSE_DIR="$(cogninav_downloads_dir)/warehouse"
+if [[ "$SOURCE" == "r2b" ]]; then
+  BAG="$WAREHOUSE_DIR/r2b_storage"
+else
+  BAG="$WAREHOUSE_DIR/${SEQ}_ros2"
+fi
+if [[ ! -d "$BAG" ]]; then
+  echo "Missing bag $BAG — see README.md (Datasets)"
+  exit 1
+fi
+
 export COGNINAV_BENCHMARK_PHASE=0
 "$ROOT/benchmarks/run_warehouse_slam.sh" --source "$SOURCE" --seq "$SEQ"
 

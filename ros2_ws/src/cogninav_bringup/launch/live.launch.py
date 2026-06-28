@@ -11,6 +11,7 @@ import os
 def generate_launch_description() -> LaunchDescription:
     pkg_share = get_package_share_directory("cogninav_bringup")
     use_viz = LaunchConfiguration("use_viz")
+    use_pangolin_viewer = LaunchConfiguration("use_pangolin_viewer")
     use_lanes = LaunchConfiguration("use_lanes")
     use_depth = LaunchConfiguration("use_depth")
     use_vslam = LaunchConfiguration("use_vslam")
@@ -23,12 +24,13 @@ def generate_launch_description() -> LaunchDescription:
             raise RuntimeError(
                 f"Unknown rig '{rig_name}' — expected config at {params_file}"
             )
+        pangolin = LaunchConfiguration("use_pangolin_viewer").perform(context).lower() == "true"
         return [
             Node(
                 package="cogninav_vslam",
                 executable="orb_slam3_node",
                 name="cogninav_vslam",
-                parameters=[params_file],
+                parameters=[params_file, {"use_orb_viewer": pangolin}],
                 output="screen",
                 condition=IfCondition(use_vslam),
             ),
@@ -74,6 +76,11 @@ def generate_launch_description() -> LaunchDescription:
                 "use_viz",
                 default_value="true",
                 description="Iridescence viewer (requires DISPLAY / X11)",
+            ),
+            DeclareLaunchArgument(
+                "use_pangolin_viewer",
+                default_value="false",
+                description="ORB-SLAM3 Pangolin viewer (mutually exclusive with use_viz)",
             ),
             DeclareLaunchArgument("use_lanes", default_value="true"),
             DeclareLaunchArgument("use_depth", default_value="true"),

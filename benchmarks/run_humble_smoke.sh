@@ -29,7 +29,7 @@ echo "==> Humble smoke (warehouse $SEQ)"
 
 if [[ ! -f "$ORB_LIB" ]]; then
   echo "==> Building ORB-SLAM3 for Humble (first time)..."
-  "$ROOT/scripts/setup_deps.sh"
+  "$ROOT/docker/setup_deps.sh"
 fi
 
 set +u
@@ -60,7 +60,12 @@ export COGNINAV_IN_HUMBLE=1
 export COGNINAV_IN_DOCKER=1
 export COGNINAV_BENCHMARK_PHASE=3
 
-"$ROOT/scripts/download_warehouse.sh" --seq "$SEQ"
-"$ROOT/benchmarks/run_warehouse_slam.sh" --seq "$SEQ"
+PLAY_BAG="$WAREHOUSE_DIR/${SEQ}_ros2"
+if [[ ! -d "$PLAY_BAG" ]]; then
+  echo "Missing bag $PLAY_BAG — see README.md (Datasets)"
+  exit 1
+fi
+
+"$ROOT/benchmarks/run_warehouse_slam.sh" --source torwic --seq "$SEQ"
 
 echo "==> Humble warehouse smoke complete."

@@ -1,10 +1,14 @@
-third_party/ORB_SLAM3/
-ros2_ws/build/
-ros2_ws/install/
-ros2_ws/log/
-models/*.caffemodel
-benchmarks/results/*.json
-benchmarks/results/*.zip
-*.pyc
+.venv/
 __pycache__/
+*.pyc
 .DS_Store
+
+# large third-party checkout (cloned by scripts/setup.sh)
+third_party/
+
+# model weights (downloaded by scripts/setup.sh)
+models/
+
+# datasets and run artifacts
+data/
+outputs/

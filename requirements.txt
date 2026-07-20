@@ -1,0 +1,18 @@
+# PyTorch (install first, matching your CUDA):
+#   pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu128
+# LingBot-Map (cloned by scripts/setup.sh):
+#   pip install -e "third_party/lingbot-map[vis]"
+
+transformers==4.57.1
+numpy<2
+opencv-python
+Pillow
+peft
+accelerate
+imageio
+imageio-ffmpeg
+onnxruntime-gpu
+huggingface_hub[hf_transfer]
+rosbags
+decord==0.6.0
+lmdb

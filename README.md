@@ -35,6 +35,12 @@ Full-resolution videos: [`assets/demo_road.mp4`](assets/demo_road.mp4) · [`asse
 
 ![Path overlay](assets/path_overlay.gif)
 
+**LingBot-Map side-by-side SLAM demo** — input camera feed (left) and the live point-cloud map + trajectory (right) for the same drive:
+
+![LingBot-Map side-by-side SLAM](assets/slam_sidebyside.gif)
+
+Full-resolution video: [`assets/slam_sidebyside.mp4`](assets/slam_sidebyside.mp4)
+
 ---
 
 ## What it does
@@ -71,8 +77,9 @@ FlashInfer (`pip install flashinfer-python`) raises SLAM throughput further (~20
 git clone https://github.com/<you>/CogniNav && cd CogniNav
 ./scripts/setup.sh          # venv + PyTorch cu128 + lingbot-map + model weights (~12 GB)
 
-./scripts/run_road_demo.sh       # KITTI city drive (auto-downloads ~640 MB)
-./scripts/run_warehouse_demo.sh  # NVIDIA r2b warehouse bag (auto-downloads ~2.9 GB)
+./scripts/run_road_demo.sh            # KITTI city drive (auto-downloads ~640 MB)
+./scripts/run_warehouse_demo.sh       # NVIDIA r2b warehouse bag (auto-downloads ~2.9 GB)
+./scripts/run_slam_sidebyside.sh      # input + LingBot-Map point-cloud map side-by-side
 ```
 
 Each demo writes a dashboard video to `outputs/<run>/cogninav_<mode>.mp4`.
@@ -122,13 +129,14 @@ Stage results are cached (`slam.npz`, `detections.npz`), so re-rendering with di
 ```
 CogniNav/
   cogninav/
-    data.py       # frame sources: folders, videos, ROS 2 bags (rosbags, no ROS)
-    slam.py       # LingBot-Map streaming inference + depth unprojection
-    detect.py     # LocateAnything-3B worker + <ref>/<box> output parser
-    lanes.py      # road / warehouse corridor detection with temporal smoothing
-    viz.py        # NumPy point-cloud renderer + dashboard compositor
-    pipeline.py   # end-to-end CLI
-  scripts/        # setup.sh, run_road_demo.sh, run_warehouse_demo.sh
+    data.py            # frame sources: folders, videos, ROS 2 bags (rosbags, no ROS)
+    slam.py            # LingBot-Map streaming inference + depth unprojection
+    detect.py          # LocateAnything-3B worker + <ref>/<box> output parser
+    lanes.py           # road / warehouse corridor detection with temporal smoothing
+    viz.py             # NumPy point-cloud renderer + dashboard compositor
+    pipeline.py        # end-to-end navigation dashboard CLI
+    slam_sidebyside.py # input + LingBot-Map point-cloud map side-by-side renderer
+  scripts/        # setup.sh, run_road_demo.sh, run_warehouse_demo.sh, run_slam_sidebyside.sh
   assets/         # demo GIFs / MP4s shown above
   models/         # weights (downloaded by setup.sh, gitignored)
   third_party/    # lingbot-map clone (gitignored)

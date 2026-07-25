@@ -12,3 +12,8 @@ models/
 # datasets and run artifacts
 data/
 outputs/
+
+# large source video files (keep outputs/MP4s, ignore raw inputs)
+*.mp4
+!assets/*.mp4
+!assets/**/*.mp4

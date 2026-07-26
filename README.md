@@ -35,11 +35,11 @@ Full-resolution videos: [`assets/demo_road.mp4`](assets/demo_road.mp4) · [`asse
 
 ![Path overlay](assets/path_overlay.gif)
 
-**LingBot-Map side-by-side SLAM demo** — input camera feed (left) and the live point-cloud map + trajectory (right) for the same drive:
+**LingBot-Map side-by-side SLAM demo** — input camera feed (left) and the live point-cloud map + trajectory (right) for an indoor drone flight:
 
-![LingBot-Map side-by-side SLAM](assets/slam_sidebyside.gif)
+![LingBot-Map indoor drone side-by-side SLAM](assets/slam_indoor_drone.gif)
 
-Full-resolution video: [`assets/slam_sidebyside.mp4`](assets/slam_sidebyside.mp4)
+Full-resolution video: [`assets/slam_indoor_drone.mp4`](assets/slam_indoor_drone.mp4)
 
 ---
 
@@ -79,7 +79,7 @@ git clone https://github.com/<you>/CogniNav && cd CogniNav
 
 ./scripts/run_road_demo.sh            # KITTI city drive (auto-downloads ~640 MB)
 ./scripts/run_warehouse_demo.sh       # NVIDIA r2b warehouse bag (auto-downloads ~2.9 GB)
-./scripts/run_slam_sidebyside.sh      # input + LingBot-Map point-cloud map side-by-side
+./scripts/run_slam_indoor_drone.sh    # indoor drone flight + LingBot-Map point-cloud map side-by-side
 ```
 
 Each demo writes a dashboard video to `outputs/<run>/cogninav_<mode>.mp4`.
@@ -136,7 +136,7 @@ CogniNav/
     viz.py             # NumPy point-cloud renderer + dashboard compositor
     pipeline.py        # end-to-end navigation dashboard CLI
     slam_sidebyside.py # input + LingBot-Map point-cloud map side-by-side renderer
-  scripts/        # setup.sh, run_road_demo.sh, run_warehouse_demo.sh, run_slam_sidebyside.sh
+  scripts/        # setup.sh, run_road_demo.sh, run_warehouse_demo.sh, run_slam_indoor_drone.sh
   assets/         # demo GIFs / MP4s shown above
   models/         # weights (downloaded by setup.sh, gitignored)
   third_party/    # lingbot-map clone (gitignored)
